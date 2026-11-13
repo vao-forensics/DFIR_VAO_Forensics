@@ -1,0 +1,201 @@
+version: "3.8"
+services:
+  # --- 1) MEMORY: Vector DB (Qdrant) ---
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - "/srv/dfir/qdrant_data:/qdrant/storage"
+    networks:
+      - ai-net
+  # --- 2) WORKER: n8n ---
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_PORT=5678
+      - GENERIC_TIMEZONE=Europe/Kyiv
+      - N8N_RUNNERS_TASK_TIMEOUT=1200
+      - TZ=Europe/Kyiv
+      - N8N_RESTRICT_FILE_ACCESS_TO=/data
+      - NODES_EXCLUDE=[]
+      - WEBHOOK_URL=${NGROK_URL}/
+      - N8N_EDITOR_BASE_URL=${NGROK_URL}/
+      - N8N_PROTOCOL=https
+      - N8N_HOST=${NGROK_HOST}
+      - N8N_SECURE_COOKIE=false
+      - N8N_SAMESITE_COOKIE=lax
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+    volumes:
+      - "/srv/dfir/n8n_data:/home/node/.n8n"
+      - "/srv/dfir/files:/data"
+      - "/srv/dfir/uploads:/data/uploads"
+      - "/home/dfir-bot/.openclaw/workspace/case_library:/data/case_library"
+    depends_on:
+      - qdrant
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - ai-net
+  # --- 3) TUNNEL: ngrok (автостарт) ---
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok
+    restart: unless-stopped
+    command:
+      - "http"
+      - "n8n:5678"
+      - "--url=${NGROK_URL}"
+      - "--host-header=rewrite"
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    ports:
+      - "4040:4040"
+    depends_on:
+      - n8n
+    networks:
+      - ai-net
+
+  # --- 4) UPLOADER: HTML форма / landing page ---
+  uploader:
+    image: nginx:alpine
+    container_name: dfir-uploader
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/srv/dfir/uploader/html:/usr/share/nginx/html:ro"
+      - "/srv/dfir/uploader/nginx:/etc/nginx/conf.d:ro"
+    depends_on:
+      - n8n
+      - tusd
+    networks:
+      - ai-net
+  # --- 5) LARGE UPLOADS: tusd (resumable, up to 10GB) ---
+  tusd:
+    image: tusproject/tusd:latest
+    container_name: tusd
+    restart: unless-stopped
+    command:
+      - "-host=0.0.0.0"
+      - "-port=1080"
+      - "-base-path=/files/"
+      - "-upload-dir=/data"
+      - "-max-size=10737418240"
+      - "-cors-allow-origin=.*"
+      - "-hooks-enabled-events=post-finish"
+      - "-hooks-http=http://n8n:5678/webhook/tusd-complete"
+    volumes:
+      - "/srv/dfir/uploads:/data"
+    ports:
+      - "1080:1080"
+    depends_on:
+      - n8n
+    networks:
+      - ai-net
+  # --- 6) SAFETY: Backups (1 раз на добу) ---
+  backup:
+    image: alpine:latest
+    container_name: n8n-qdrant-backup
+    restart: unless-stopped
+    volumes:
+      - "/srv/dfir/n8n_data:/source/n8n_data:ro"
+      - "/srv/dfir/qdrant_data:/source/qdrant_data:ro"
+      - "/srv/dfir/files:/source/files:ro"
+      - "/srv/dfir/backups:/backup"
+    command: >
+      sh -c "
+        echo 'Backup service started';
+        while true; do
+          if [ $$(date +%H) -eq 03 ] && [ $$(date +%M) -eq 00 ]; then
+            STAMP=$$(date +%Y%m%d_%H%M%S);
+            echo '=== Backup: '$$STAMP' ===';
+            tar czf /backup/n8n_$$STAMP.tar.gz -C /source/n8n_data . && echo 'n8n OK';
+            tar czf /backup/qdrant_$$STAMP.tar.gz -C /source/qdrant_data . && echo 'qdrant OK';
+            tar czf /backup/files_$$STAMP.tar.gz -C /source/files . && echo 'files OK';
+            find /backup -name '*.tar.gz' -mtime +30 -delete && echo 'Old backups cleaned';
+            sleep 120;
+          fi;
+          sleep 60;
+        done
+      "
+    networks:
+      - ai-net
+
+  # --- 7) LOG DB: PostgreSQL for structured CSV ingestion ---
+  logdb:
+    image: postgres:16-alpine
+    container_name: logdb
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=dfir_logs
+      - POSTGRES_USER=dfir
+      - POSTGRES_PASSWORD=CHANGE_ME_POSTGRES_PASSWORD
+      - TZ=Europe/Kyiv
+    ports:
+      - "5433:5432"
+    volumes:
+      - "/home/dfir-bot/.openclaw/workspace/services/logdb/data:/var/lib/postgresql/data"
+      - "/home/dfir-bot/.openclaw/workspace/services/logdb/init:/docker-entrypoint-initdb.d:ro"
+    networks:
+      - ai-net
+
+  # --- 8) LOG DB WEB UI: Adminer ---
+  logdb-adminer:
+    image: adminer:4
+    container_name: logdb-adminer
+    restart: unless-stopped
+    ports:
+      - "8093:8080"
+    depends_on:
+      - logdb
+    networks:
+      - ai-net
+
+  # --- 9) LOG DB WEB UI: pgAdmin ---
+  logdb-pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: logdb-pgadmin
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@dfirbot.com
+      - PGADMIN_DEFAULT_PASSWORD=CHANGE_ME_PGADMIN_DEFAULT_PASSWORD
+      - PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION=False
+      - PGADMIN_CONFIG_CONSOLE_LOG_LEVEL=30
+    ports:
+      - "8094:80"
+    volumes:
+      - "/home/dfir-bot/.openclaw/workspace/services/pgadmin:/var/lib/pgadmin"
+    depends_on:
+      - logdb
+    networks:
+      - ai-net
+
+  case-maintainer:
+    build: /home/dfir-bot/.openclaw/workspace/services/case_maintainer
+    container_name: case-maintainer
+    restart: unless-stopped
+    environment:
+      - MAINTAINER_TOKEN=
+      - CASE_LIBRARY=/data/case_library
+      - PG_DSN=host=logdb port=5432 dbname=dfir_logs user=dfir password=CHANGE_ME_POSTGRES_PASSWORD
+      - DFIR_OLLAMA_URL=http://192.168.100.1:1234
+      - DFIR_OLLAMA_MODEL=gpt-oss-120b-heretic-v2
+    volumes:
+      - "/home/dfir-bot/.openclaw/workspace/case_library:/data/case_library"
+      - "/srv/dfir/uploads:/tusd_uploads"
+      - "/home/dfir-bot/.openclaw/workspace/services/case_maintainer/app.py:/app/app.py:ro"
+    depends_on:
+      - logdb
+    networks:
+      - ai-net
+networks:
+  ai-net:
+    driver: bridge

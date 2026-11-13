@@ -1,0 +1,51 @@
+# =============================================================================
+# BOOKIDX open-book exam index generator - configuration
+# FULLY OFFLINE. The only network call is to a LOCAL LLM (localhost/LAN only).
+# =============================================================================
+
+llm:
+  # backend: "openai" (OpenAI-compatible, e.g. local llama-swap) or "ollama"
+  backend: "openai"
+
+  openai:
+    base_url: "http://127.0.0.1:1234/v1"
+    model: "synth-dfir"        # strong DFIR model (Qwen3-30B MoE, cards 2,3)
+
+  ollama:
+    base_url: "http://localhost:11434"
+    model: "qwen2.5:14b"
+
+  temperature: 0
+  timeout: 60          # seconds per request
+  max_retries: 1       # retries on malformed JSON (besides the first attempt)
+  # If the local LLM is unreachable/overloaded, fall back to a built-in mock so
+  # the (regex-driven) pipeline still completes. The regex pre-pass alone yields
+  # a useful index even with zero LLM.
+  use_mock_on_failure: true
+
+# Chunking: long pages are split; EVERY chunk keeps its exact printed_page.
+chunk:
+  target_tokens: 600
+  max_tokens: 800
+  overlap_tokens: 60
+
+extraction:
+  strip_headers_footers: true    # remove recurring header/footer lines
+  footer_verification: true      # warn if footer page number != computed printed_page
+  header_footer_min_repeats: 3   # a line must repeat on >= N pages to be treated as header/footer
+
+# Only keep candidate rows with weight >= this (CLI --min-weight overrides).
+min_weight: 1
+
+# ---------------------------------------------------------------------------
+# Books: map each PDF to a label and page offset.
+#   printed_page = pdf_page_index_1based - page_offset
+# Use start_page/end_page (1-based PDF indices) to skip front/back matter.
+# See README for how to calibrate page_offset with footer verification.
+# ---------------------------------------------------------------------------
+books:
+  - path: "books/sample.pdf"
+    book_label: "Book 1"
+    page_offset: 2        # e.g. 2 cover/TOC pages before printed page 1
+    start_page: null
+    end_page: null

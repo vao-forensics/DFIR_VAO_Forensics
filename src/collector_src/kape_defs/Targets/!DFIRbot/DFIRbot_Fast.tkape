@@ -1,0 +1,70 @@
+Description: DFIR bot FAST triage — what the bot can actually reason about, without the slow bulk
+Author: DFIR-project
+Version: 1.2
+Id: 7a1c0001-0a0a-4b0a-9001-000000000001
+RecreateDirectories: true
+# 2026-08-22. Measured before changing anything:
+#   * KapeTriage ALREADY contains WebBrowsers, RemoteAdmin, PowerShellConsole, SRUM, SUM,
+#     EventLogs, FileSystem, RegistryHives, EvidenceOfExecution, LNK/JumpLists, WBEM,
+#     ScheduledTasks, RecycleBin, WER, WindowsTimeline and CloudStorage_Metadata - so three
+#     of the seven entries in v1.1 were repeating what was already collected;
+#   * RemoteAdmin is itself a compound of THIRTY remote-access tools (AnyDesk, RustDesk,
+#     TeamViewer, RMS, Radmin, UltraViewer, QuickAssist, Remcos, ScreenConnect...), which
+#     the bot's threat detection hunts for by name - FAST was never missing those;
+#   * what FAST genuinely lacked were small, high-value artefacts that only FULL carried.
+# So: drop the repetition, add what is cheap to collect and answers a question the report
+# asks. Nothing large was added - ThumbCache and RoamingProfile stay FULL-only on purpose.
+Targets:
+    -
+        Name: KapeTriage
+        Category: Targets
+        Path: KapeTriage.tkape
+    -
+        Name: WindowsDefender
+        Category: Targets
+        Path: WindowsDefender.tkape
+    -
+        Name: BITS
+        Category: Targets
+        Path: BITS.tkape
+    -
+        Name: RDPCache
+        Category: Targets
+        Path: RDPCache.tkape
+    # --- added 2026-08-22: small, and each one answers something the report asks -------
+    -
+        # what was actually typed into PowerShell; the console history in KapeTriage only
+        # shows the last lines per user, transcripts show whole sessions
+        Name: PowerShellTranscripts
+        Category: Targets
+        Path: PowerShellTranscripts.tkape
+    -
+        # which RDP sessions were opened FROM this machine - the other half of RDPCache
+        Name: RDPJumplist
+        Category: Targets
+        Path: RDPJumplist.tkape
+    -
+        # USB history: the exfiltration route that leaves no network trace
+        Name: USBDetective
+        Category: Targets
+        Path: USBDetective.tkape
+    -
+        # VPN client configs and logs - how the operator got in, or got out
+        Name: VPNClients
+        Category: Targets
+        Path: VPNClients.tkape
+    -
+        # the notification database keeps message previews long after the app is gone
+        Name: WindowsNotificationsDB
+        Category: Targets
+        Path: WindowsNotificationsDB.tkape
+    -
+        # network profiles and interface history
+        Name: WindowsNetwork
+        Category: Targets
+        Path: WindowsNetwork.tkape
+    -
+        # FTP client: the plainest exfiltration tool there is
+        Name: FileZillaClient
+        Category: Targets
+        Path: FileZillaClient.tkape

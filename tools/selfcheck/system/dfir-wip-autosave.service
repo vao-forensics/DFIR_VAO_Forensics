@@ -1,0 +1,7 @@
+[Unit]
+Description=Snapshot uncommitted /srv/dfir work to refs/wip/autosave (power-loss insurance)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/dfir
+ExecStart=/bin/sh -c "s=$(git stash create) && [ -n \"$s\" ] && git update-ref -m autosave refs/wip/autosave $s && sync || true"

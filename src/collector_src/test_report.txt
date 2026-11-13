@@ -1,0 +1,10 @@
+DFIR FINAL T4 (image/FULL, Chainsaw fixed)
+[17:54:04] === final T4 after Chainsaw --full removal ===
+[17:54:04] built C:\DFIR\Run_KAPE_TEST.bat (set/p parameterized via env; explorer+pause stripped)
+[17:54:04] --- RUN(bat) T4imgfull : scen=2 drv=C mode=2 timeout=1800s ---
+[18:04:41]     T4imgfull finished rc=0 in 636s
+[18:04:41] T4imgfull    scen=2 FULL  PASS=True  zip=94MB raw_hives=4 motw=True live=False hello=True
+[18:04:41]    top=2026-06-26T14_56_03_1048614_ConsoleLog.txt,AccountUsage,EventLogs,FileDeletion,FileFolderAccess,FileSystem,ForensicTimeliner,IOCs,ProgramExecution,Registry,RemoteAccess,SQLDatabases,SRUMDatabase,SUMDatabase,WebBrowsers,Windows,_raw,motw
+[18:04:41]    note: work dir removed after capture
+[18:04:41] T4 GREEN
+[18:04:41] done.

@@ -1,0 +1,13 @@
+[Unit]
+Description=DFIR VM self-check after boot (power-loss damage detection + safe repairs, report to owner)
+After=network-online.target docker.service dfir-boot-notify.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 60
+ExecStart=/usr/bin/python3 -I /srv/dfir/tools/selfcheck/dfir_selfcheck.py --boot
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

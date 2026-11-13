@@ -1,0 +1,16 @@
+[Unit]
+Description=DFIR personal sandboxes gateway (OpenAPI tool server for Open WebUI)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Environment=DFIR_ROOT=@ROOT@
+Environment=USBX_BIND=@GW@
+# fail closed: without the egress rules the gateway does not start
+ExecStartPre=@ROOT@/infra/sandbox/firewall.sh
+ExecStart=/usr/bin/python3 @ROOT@/tools/usandbox_gateway.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

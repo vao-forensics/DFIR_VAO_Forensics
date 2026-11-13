@@ -1,0 +1,150 @@
+Description: DFIR bot FULL triage — broad collection incl. remote-access/VPN apps the bot ingests
+Author: DFIR-project
+Version: 1.1
+Id: 7a1c0002-0a0a-4b0a-9002-000000000002
+RecreateDirectories: true
+Targets:
+    -
+        Name: KapeTriage
+        Category: Targets
+        Path: KapeTriage.tkape
+    -
+        Name: WebBrowsers
+        Category: Targets
+        Path: WebBrowsers.tkape
+    -
+        Name: WindowsDefender
+        Category: Targets
+        Path: WindowsDefender.tkape
+    -
+        Name: BITS
+        Category: Targets
+        Path: BITS.tkape
+    -
+        Name: RemoteAdmin
+        Category: Targets
+        Path: RemoteAdmin.tkape
+    -
+        Name: PowerShellConsole
+        Category: Targets
+        Path: PowerShellConsole.tkape
+    -
+        Name: PowerShellTranscripts
+        Category: Targets
+        Path: PowerShellTranscripts.tkape
+    -
+        Name: RustDesk
+        Category: Targets
+        Path: RustDesk.tkape
+    -
+        Name: AnyDesk
+        Category: Targets
+        Path: AnyDesk.tkape
+    -
+        Name: Ammyy
+        Category: Targets
+        Path: Ammyy.tkape
+    -
+        Name: Radmin
+        Category: Targets
+        Path: Radmin.tkape
+    -
+        Name: Remcos
+        Category: Targets
+        Path: Remcos.tkape
+    -
+        Name: TeamViewerLogs
+        Category: Targets
+        Path: TeamViewerLogs.tkape
+    -
+        Name: Ultraviewer
+        Category: Targets
+        Path: Ultraviewer.tkape
+    -
+        Name: RemoteUtilities_app
+        Category: Targets
+        Path: RemoteUtilities_app.tkape
+    -
+        Name: RemoteManipulatorSystem
+        Category: Targets
+        Path: RemoteManipulatorSystem.tkape
+    -
+        Name: RemoteDesktopManager
+        Category: Targets
+        Path: RemoteDesktopManager.tkape
+    -
+        Name: QuickAssist
+        Category: Targets
+        Path: QuickAssist.tkape
+    -
+        Name: RDPCache
+        Category: Targets
+        Path: RDPCache.tkape
+    -
+        Name: RDPJumplist
+        Category: Targets
+        Path: RDPJumplist.tkape
+    -
+        Name: ThumbCache
+        Category: Targets
+        Path: ThumbCache.tkape
+    -
+        Name: WindowsTimeline
+        Category: Targets
+        Path: WindowsTimeline.tkape
+    -
+        Name: WindowsNotificationsDB
+        Category: Targets
+        Path: WindowsNotificationsDB.tkape
+    -
+        Name: WindowsNetwork
+        Category: Targets
+        Path: WindowsNetwork.tkape
+    -
+        Name: EvidenceOfExecution
+        Category: Targets
+        Path: EvidenceOfExecution.tkape
+    -
+        Name: CloudStorage_Metadata
+        Category: Targets
+        Path: CloudStorage_Metadata.tkape
+    -
+        Name: OneDrive_Metadata
+        Category: Targets
+        Path: OneDrive_Metadata.tkape
+    -
+        Name: USBDetective
+        Category: Targets
+        Path: USBDetective.tkape
+    -
+        Name: WindowsHello
+        Category: Targets
+        Path: WindowsHello.tkape
+    -
+        Name: VPNClients
+        Category: Targets
+        Path: VPNClients.tkape
+    -
+        Name: FileZillaClient
+        Category: Targets
+        Path: FileZillaClient.tkape
+    -
+        Name: OpenSSHClient
+        Category: Targets
+        Path: OpenSSHClient.tkape
+    -
+        Name: OpenSSHServer
+        Category: Targets
+        Path: OpenSSHServer.tkape
+    -
+        Name: Notepad
+        Category: Targets
+        Path: Notepad.tkape
+    -
+        Name: Notepad++
+        Category: Targets
+        Path: Notepad++.tkape
+    -
+        Name: RoamingProfile
+        Category: Targets
+        Path: RoamingProfile.tkape

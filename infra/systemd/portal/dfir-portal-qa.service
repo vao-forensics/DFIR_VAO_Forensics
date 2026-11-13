@@ -1,0 +1,10 @@
+[Unit]
+Description=DFIR: Portal self-check and safe self-repair
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=DFIR_ROOT=@ROOT@
+Environment=DFIR_PORTAL_LLM=http://@LLM@:1234
+ExecStart=/usr/bin/python3 @ROOT@/tools/portal_qa.py
+TimeoutStartSec=3600

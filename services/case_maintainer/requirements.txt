@@ -1,0 +1,25 @@
+flask==3.0.3
+psycopg2-binary==2.9.9
+gunicorn==22.0.0
+reportlab==4.2.5
+# httpx: required by case_maintainer_addtools (sidecar proxy for "Додаткові інструменти").
+# Pinned to the version already present at runtime so the image matches the live env.
+httpx==0.28.1
+# --- 2026-08-01: pinned to match the LIVE container env (it had drifted far from this
+# file: these were pip-installed ad hoc into the writable layer and would be LOST on any
+# container recreate). Everything imported by the code now lives in the image. ---
+regipy==6.2.1
+extract-msg==0.55.0
+oletools==0.60.2
+pymupdf==1.28.0
+lmstudio==1.5.0
+# requests: used by app.py _yara_scan_bytes (sidecar YARA). Was MISSING -> YARA scan
+# silently no-op'd (import inside try/except).
+requests==2.32.5
+# pypdf: app.py PDF text extraction. Was MISSING -> app self-pip-installed at runtime.
+pypdf==6.1.3
+# cryptography: needed by the isolated /opt/impacket install (installed --no-deps).
+cryptography==49.0.0
+flor
+py7zr
+dissect.util>=3.20

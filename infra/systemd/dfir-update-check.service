@@ -1,0 +1,8 @@
+[Unit]
+Description=Weekly DFIR update check: code, reference databases, Open WebUI, collector tools (tells the owner once per new set, changes nothing)
+After=network-online.target docker.service
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /srv/dfir/tools/update/dfir_update.py check --notify
+SuccessExitStatus=3

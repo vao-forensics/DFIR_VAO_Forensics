@@ -1,0 +1,8 @@
+Name: CustomFileHashing
+Author: Your Name
+Description: Generates SHA256 hashes for collected system files
+Category: FileProcessing
+Version: 1.0
+Id: 234e5678-e89b-12d3-a456-426614174001
+Program: powershell.exe
+CommandLine: -Command "Get-FileHash -Path {Path} -Algorithm SHA256 | Export-Csv -Path {OutputDir}\file_hashes.csv -NoTypeInformation"

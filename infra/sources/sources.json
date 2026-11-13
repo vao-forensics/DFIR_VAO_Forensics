@@ -1,0 +1,52 @@
+{
+ "schema": 1,
+ "note": "Every external dataset the VM analysis uses: official source, how the latest version is found, how a download is verified, what is built from it. tools/sources/dfir_sources.py reads this file; nothing is fetched from anywhere else. Collector-side tools (EZ Tools, Hayabusa/Sigma rules) are in tools/tools_manifest.json and the Builder (task T6).",
+ "dest_dir": "cases/_hashdb",
+ "container": "case-maintainer",
+ "container_dest_dir": "/data/case_library/_hashdb",
+ "sources": [
+  {
+   "id": "vanilla_windows_reference",
+   "title": "VanillaWindowsReference: file paths of stock Windows 8/10/11/Server",
+   "role": "known-good PATHS: added files in system dirs, masquerading names",
+   "homepage": "https://github.com/AndrewRathbun/VanillaWindowsReference",
+   "license": "MIT",
+   "kind": "github_file",
+   "repo": "AndrewRathbun/VanillaWindowsReference",
+   "path": "FIlePathHashSets/UniqueDirectoryAndNames.7z",
+   "file": "UniqueDirectoryAndNames.7z",
+   "verify": ["git_blob_sha1", "size", "7z_test"],
+   "build": "vanilla",
+   "output": "vanilla_paths.sqlite"
+  },
+  {
+   "id": "circl_hashlookup_bloom",
+   "title": "CIRCL hashlookup bloom filter (includes the whole NSRL)",
+   "role": "known-good SHA-1; 'not in filter' = unknown binary lead",
+   "homepage": "https://www.circl.lu/services/hashlookup/",
+   "license": "see homepage (CIRCL hashlookup terms)",
+   "kind": "http",
+   "url": "https://cra.circl.lu/hashlookup/hashlookup-full.bloom",
+   "file": "hashlookup-full.bloom",
+   "verify": ["content_length", "bloom_selftest"],
+   "build": "none",
+   "output": "hashlookup-full.bloom"
+  },
+  {
+   "id": "malwarebazaar_full",
+   "title": "MalwareBazaar full export (abuse.ch): SHA-256/SHA-1 + malware family",
+   "role": "known-BAD hashes",
+   "homepage": "https://bazaar.abuse.ch/export/",
+   "license": "CC0 (abuse.ch MalwareBazaar data)",
+   "kind": "http",
+   "url": "https://mb-api.abuse.ch/v2/files/exports/{ABUSECH_AUTH_KEY}/full.csv.zip",
+   "auth_env": "ABUSECH_AUTH_KEY",
+   "auth_note": "Since 2025 abuse.ch serves exports only with a free Auth-Key (https://auth.abuse.ch). Without it the old public URL answers 410 Gone and the current database stays as it is.",
+   "refresh_days": 7,
+   "file": "mb_full_csv.zip",
+   "verify": ["zip_crc", "rows_not_shrinking"],
+   "build": "known_bad",
+   "output": "known_bad.sqlite"
+  }
+ ]
+}

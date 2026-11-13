@@ -1,0 +1,672 @@
+# Fixed project name: image names (dfir-case-maintainer, dfir-tools-sidecar...) must not depend on the clone folder
+name: dfir
+
+services:
+  # --- 1) MEMORY: Vector DB (Qdrant) ---
+  qdrant:
+    image: qdrant/qdrant:latest@sha256:94728574965d17c6485dd361aa3c0818b325b9016dac5ea6afec7b4b2700865f
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - "./services/qdrant:/qdrant/storage"
+    networks:
+      - dfir-net
+
+  # --- 2) WORKER: n8n ---
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest@sha256:2d70fafea7c0c397f40df30daa31243c0bff590e9e87e0430398e7cb4d3d8d0b
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      - N8N_PORT=5678
+      - GENERIC_TIMEZONE=Europe/Kyiv
+      - N8N_RUNNERS_TASK_TIMEOUT=3600
+      - N8N_RUNNERS_TASK_REQUEST_TIMEOUT=1800
+      - TZ=Europe/Kyiv
+      - N8N_RESTRICT_FILE_ACCESS_TO=/data
+      - NODES_EXCLUDE=[]
+      - WEBHOOK_URL=${NGROK_URL}/
+      - N8N_EDITOR_BASE_URL=${NGROK_URL}/
+      - N8N_PROTOCOL=https
+      - N8N_HOST=${NGROK_HOST}
+      - N8N_SECURE_COOKIE=false
+      - N8N_SAMESITE_COOKIE=lax
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      - N8N_PROXY_HOPS=1
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=336
+      - EXECUTIONS_DATA_PRUNE_MAX_COUNT=20000
+    volumes:
+      - "./services/n8n:/home/node/.n8n"
+      - "./var/files:/data"
+      - "./var/uploads:/data/uploads"
+      - "./cases:/data/case_library"
+    depends_on:
+      - qdrant
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - dfir-net
+
+  # --- 3) TUNNEL: ngrok (Telegram webhook only) ---
+  webhook-gate:
+    # 17.10: internet (ngrok) may reach ONLY the Telegram webhook; was an override file that got lost on recreate
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    container_name: webhook-gate
+    restart: unless-stopped
+    volumes:
+      - ./services/webhook-gate/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      - dfir-net
+    depends_on:
+      - n8n
+  tg-i18n:
+    # 23.10: every user gets the bot in their own language (services/tg_i18n/i18n.py): outbound Telegram
+    # calls of n8n (credential baseUrl, CONFIG.BOT) and case-maintainer (TG_API_BASE) come here, chats in
+    # the source language (uk) pass through byte for byte; /language is answered here. Translation runs
+    # on the always-loaded chat model, so it never swaps the analysis models out.
+    image: python:3.12-slim
+    container_name: tg-i18n
+    restart: unless-stopped
+    command: ["python3", "-u", "/app/i18n.py"]
+    environment:
+      - DFIR_TG_BOT_TOKEN=${DFIR_TG_BOT_TOKEN}
+      - DFIR_BOT_LANG=${DFIR_BOT_LANG:-uk}
+      - DFIR_LLM_URL=http://${DFIR_LLM_HOST:-192.168.100.1}:1234
+      - I18N_MODEL=gpt-small-20b
+      # T9: buttons of the modules switched off at install are hidden, their taps refused (empty = all on)
+      - DFIR_MODULES_OFF=${DFIR_MODULES_OFF:-}
+    volumes:
+      - ./services/tg_i18n:/app:ro
+      - ./infra/modules.json:/modules.json:ro
+      - ./state/i18n:/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8098/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - dfir-net
+  dfir-mcp:
+    # 18.10: the bot's case data as read-only MCP tools for agent CLI (services/dfir_mcp/server.py).
+    # Own DB role dfir_mcp (SELECT only, no user/credential tables), own state dir, code mounted ro.
+    build: ./services/dfir_mcp
+    image: dfir-mcp:1
+    container_name: dfir-mcp
+    restart: unless-stopped
+    environment:
+      - PG_DSN=host=logdb port=5432 dbname=dfir_logs user=dfir_mcp password=${MCP_PG_PASSWORD}
+      - CASE_LIBRARY=/data/case_library
+      - MCP_TOKENS=/data/state/mcp_tokens.json
+      - MCP_AUDIT=/data/state/mcp_audit.jsonl
+    volumes:
+      - ./services/case_maintainer/analysis:/app/analysis:ro
+      - ./services/case_maintainer/core:/app/core:ro
+      - ./services/case_maintainer/parsers:/app/parsers:ro
+      - ./services/case_maintainer/reports:/app/reports:ro
+      - ./cases:/data/case_library:ro
+      - ./state/mcp:/data/state
+    # a real DB login: a stale password (22-23.10, 32 h unnoticed) now shows as unhealthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,psycopg2; psycopg2.connect(os.environ['PG_DSN'], connect_timeout=5).close()"]
+      interval: 5m
+      timeout: 15s
+      retries: 2
+    networks:
+      - dfir-net
+    depends_on:
+      - logdb
+  llm-gw:
+    # 18.10: the LLM door for VPN users / Agent (services/llm_gw/gateway.py): personal keys, logging,
+    # holds a request whose model would evict a running client analysis. Replaces llm-relay.socket.
+    # Host network: ufw (1234 from 10.8.0.0/24, 10.7.0.0/24) applies; the bot does not use it.
+    build: ./services/llm_gw
+    image: llm-gw:1
+    container_name: llm-gw
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - UPSTREAM=http://${DFIR_LLM_HOST:-192.168.100.1}:1234
+      - LISTEN_PORT=${LLMGW_PORT:-1234}
+      - STATE_DIR=/data
+      - PG_DSN=host=127.0.0.1 port=5433 dbname=dfir_logs user=dfir_mcp password=${MCP_PG_PASSWORD}
+    volumes:
+      - ./state/llmgw:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,psycopg; psycopg.connect(os.environ['PG_DSN'], connect_timeout=5).close()"]
+      interval: 5m
+      timeout: 15s
+      retries: 2
+  ngrok:
+    image: ngrok/ngrok:latest@sha256:6ead4323c504b78c0a3325ad701845a74b72341c4bb1e57108edf645cbb15897
+    container_name: ngrok
+    restart: unless-stopped
+    command:
+      - "http"
+      - "webhook-gate:8099"
+      - "--url=${NGROK_URL}"
+      - "--host-header=rewrite"
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    ports:
+      - "127.0.0.1:4040:4040"
+    depends_on:
+      - n8n
+    networks:
+      - dfir-net
+
+  # --- 4) UPLOADER: HTML upload form ---
+  uploader:
+    image: nginx:alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
+    container_name: dfir-uploader
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - "./src/uploader/html:/usr/share/nginx/html:ro"
+      # who uploaded what: read by case-maintainer for upload attribution
+      - "./state/uploader_log:/var/log/nginx"
+      - "./src/uploader/nginx:/etc/nginx/conf.d:ro"
+      # audio-translate results (large UA MP3s) served as download links at /audio/
+      - "./var/audio_results:/usr/share/nginx/audio:ro"
+      # case outputs and the collector, reachable on the one port the VPN allows
+      - "./cases:/usr/share/nginx/cases:ro"
+      - "./var/translate_output:/usr/share/nginx/translate_output:ro"
+      - "./var/dist:/usr/share/nginx/dist:ro"
+    depends_on:
+      - n8n
+      - tusd
+    networks:
+      - dfir-net
+
+  # --- 5) LARGE UPLOADS: tusd (resumable, up to 10GB) ---
+  tusd:
+    image: tusproject/tusd:latest@sha256:9c61565fccd2689b052aa78e52d9558f309e98f6320960746f225d2fd73a35e3
+    container_name: tusd
+    restart: unless-stopped
+    command:
+      - "-host=0.0.0.0"
+      - "-port=1080"
+      - "-base-path=/files/"
+      - "-upload-dir=/data"
+      - "-max-size=34359738368"
+      - "-network-timeout=600s"
+      - "-cors-allow-origin=.*"
+      - "-hooks-enabled-events=post-finish"
+      - "-hooks-http=http://n8n:5678/webhook/tusd-complete"
+      # Вікно повторів має перекривати рестарт служби. Було 3 спроби по 1 с - і
+      # завантаження, що прилетіло через 16 с після рестарту, загинуло: браузер
+      # отримав 204 «успішно», а файл нікуди не зберігся (спіймано 18.09).
+      - "-hooks-http-retry=8"
+      - "-hooks-http-backoff=15s"
+    volumes:
+      - "./var/uploads:/data"
+    ports:
+      - "127.0.0.1:1080:1080"
+    depends_on:
+      - n8n
+    networks:
+      - dfir-net
+
+  # --- 6) SAFETY: Nightly backups (03:00) ---
+  backup:
+    image: alpine:latest@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
+    container_name: dfir-backup
+    restart: unless-stopped
+    volumes:
+      - "./services/n8n:/source/n8n:ro"
+      - "./services/qdrant:/source/qdrant:ro"
+      - "./var/files:/source/files:ro"
+      - "./backups:/backup"
+    command: >
+      sh -c "
+        echo 'Backup service started';
+        while true; do
+          if [ $$(date +%H) -eq 03 ] && [ $$(date +%M) -eq 00 ]; then
+            STAMP=$$(date +%Y%m%d_%H%M%S);
+            echo '=== Backup: '$$STAMP' ===';
+            tar czf /backup/n8n_$$STAMP.tar.gz --exclude='*.bak_*' --exclude='*.sqlite-wal' --exclude='*.sqlite-shm' -C /source/n8n . && echo 'n8n OK';
+            tar czf /backup/qdrant_$$STAMP.tar.gz -C /source/qdrant . && echo 'qdrant OK';
+            tar czf /backup/files_$$STAMP.tar.gz -C /source/files . && echo 'files OK';
+            find /backup -name '*.tar.gz' -mtime +30 -delete && echo 'Old backups cleaned';
+            sleep 120;
+          fi;
+          sleep 60;
+        done
+      "
+    networks:
+      - dfir-net
+
+  # --- 7) LOG DB: PostgreSQL ---
+  logdb:
+    image: postgres:16-alpine@sha256:4e6e670bb069649261c9c18031f0aded7bb249a5b6664ddec29c013a89310d50
+    container_name: logdb
+    shm_size: "1g"
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=dfir_logs
+      - POSTGRES_USER=dfir
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - TZ=Europe/Kyiv
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - "./services/logdb/data:/var/lib/postgresql/data"
+      - "./services/logdb/init:/docker-entrypoint-initdb.d:ro"
+    networks:
+      - dfir-net
+
+  # --- 7b) LOG DB nightly dump (added 2026-10-08 after power-loss incident: logdb had NO backup) ---
+  logdb-backup:
+    image: postgres:16-alpine@sha256:4e6e670bb069649261c9c18031f0aded7bb249a5b6664ddec29c013a89310d50
+    container_name: dfir-logdb-backup
+    restart: unless-stopped
+    environment:
+      - PGHOST=logdb
+      - PGUSER=dfir
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+      - PGDATABASE=dfir_logs
+      - TZ=Europe/Kyiv
+      - KEEP=3
+    volumes:
+      - "./backups/pg:/backup"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "logdb-backup started"
+        run_dump() {
+          STAMP=$$(date +%Y%m%d_%H%M%S)
+          OUT=/backup/logdb_$$STAMP.dump
+          echo "=== pg_dump $$STAMP ==="
+          if pg_dump -Fc -Z 6 -f "$$OUT.part" && pg_restore -l "$$OUT.part" >/dev/null; then
+            sync "$$OUT.part"; mv "$$OUT.part" "$$OUT"; sync /backup
+            echo "OK $$(du -h "$$OUT" | cut -f1)"
+            ls -1t /backup/logdb_*.dump | tail -n +$$((KEEP+1)) | xargs -r rm -f
+          else
+            echo "FAILED"; rm -f "$$OUT.part"
+          fi
+        }
+        [ -f /backup/RUN_NOW ] && rm -f /backup/RUN_NOW && run_dump
+        while true; do
+          if [ "$$(date +%H%M)" = "0400" ]; then run_dump; sleep 90; fi
+          [ -f /backup/RUN_NOW ] && rm -f /backup/RUN_NOW && run_dump
+          sleep 30
+        done
+    depends_on:
+      - logdb
+    networks:
+      - dfir-net
+
+  # --- 8) LOG DB WEB UI: Adminer ---
+  logdb-adminer:
+    image: adminer:4@sha256:34e8fafc1bb7f9ae57a7dcab21f55860aa27242e2842ae3d1129707a99e32b2c
+    container_name: logdb-adminer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8093:8080"
+    depends_on:
+      - logdb
+    networks:
+      - dfir-net
+
+  # --- 9) LOG DB WEB UI: pgAdmin ---
+  logdb-pgadmin:
+    image: dpage/pgadmin4:latest@sha256:ff557f69d9808085dc3554f56c1b06a36ac8cddabe4485212920b9604261abdb
+    container_name: logdb-pgadmin
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL:-admin@dfir.local}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+      - PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION=False
+      - PGADMIN_CONFIG_CONSOLE_LOG_LEVEL=30
+    ports:
+      - "127.0.0.1:8094:80"
+    volumes:
+      - "./services/pgadmin:/var/lib/pgadmin"
+    depends_on:
+      - logdb
+    networks:
+      - dfir-net
+
+  # --- 10) FILE SERVER: serve case files over HTTP ---
+  file-server:
+    image: nginx:alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
+    container_name: dfir-file-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8092:80"
+    volumes:
+      - "./src/docker/file-server/default.conf:/etc/nginx/conf.d/default.conf:ro"
+      - "./cases:/usr/share/nginx/html:ro"
+      - "./var/translate_output:/usr/share/nginx/tout:ro"
+    networks:
+      - dfir-net
+
+  # --- 11) DFIR PIPELINE: case-maintainer ---
+  case-maintainer:
+    build: ./services/case_maintainer
+    # dfir-mcp is built FROM this image
+    image: dfir-case-maintainer:latest
+    container_name: case-maintainer
+    restart: unless-stopped
+    # One Gunicorn process keeps the in-process LM Studio queue global; gthread
+    # lets /health and lightweight status endpoints respond while one request
+    # waits on a long LLM/streaming operation.
+    command: ["gunicorn","--bind","0.0.0.0:8787","--workers","1","--worker-class","gthread","--threads","8","--timeout","1200","--keep-alive","5","app:app"]
+    environment:
+      - MAINTAINER_TOKEN=
+      - DFIR_UPLOAD_BASE=${DFIR_UPLOAD_BASE:-http://${DFIR_VPN_BOT_IP:-CHANGE_ME_DFIR_LINK_IP}:8080}
+      # case files, served without a directory listing
+      - DFIR_VIEW_BASE=${DFIR_VIEW_BASE:-http://${DFIR_VPN_BOT_IP:-CHANGE_ME_DFIR_LINK_IP}:8080/view}
+      # finished audio results
+      - DFIR_AUDIO_BASE_URL=${DFIR_AUDIO_BASE_URL:-http://${DFIR_VPN_BOT_IP:-CHANGE_ME_DFIR_LINK_IP}:8080/audio}
+      # the collector, previously served from the host on 8099
+      - DFIR_COLLECTOR_URL=${DFIR_COLLECTOR_URL:-http://${DFIR_VPN_BOT_IP:-CHANGE_ME_DFIR_LINK_IP}:8080/collector.exe}
+      # browser chat: lab LAN only, it is not published to VPN clients
+      - DFIR_WEBUI_BASE=${DFIR_WEBUI_BASE:-http://${DFIR_VPN_BOT_IP:-CHANGE_ME_DFIR_LINK_IP}:8080/chat/}
+      # 2026-08-01: free chat was capped at 2000 tokens -> answers stopped mid-sentence.
+      - DFIR_FREECHAT_MAX_TOKENS=6000
+      - CASE_LIBRARY=/data/case_library
+      - PG_DSN=host=logdb port=5432 dbname=dfir_logs user=dfir password=${POSTGRES_PASSWORD}
+      - DFIR_LLM_URL=http://${DFIR_LLM_HOST:-192.168.100.1}:1234
+      - DFIR_LLM_CTRL_URL=${DFIR_LLM_CTRL_URL:-http://${DFIR_LLM_HOST:-192.168.100.1}:8790}
+      - DFIR_LLM_CTRL_TOKEN=${DFIR_LLM_CTRL_TOKEN}
+      # 2026-06-24 LLM ARCH FINAL: SPLIT FAST/STRONG, llama-swap matrix owns swaps.
+      #   FAST  (chat / case Q&A / routing / formatting) -> gpt-oss-20b-heretic
+      #         resident on card0, coexists with gemma(card1)+embedding(card4):
+      #         chat<->translate NEVER swap. Validated ~11 tok/s, quality good-enough.
+      #   STRONG (deep synthesis / full reports / timeline) -> gpt-oss-120b-heretic-v2
+      #         on-demand on cards 0-4; loading it evicts the small chat+translate set
+      #         (cheap reload after). The matrix solver in C:/llama-swap/config.yaml is
+      #         the SOLE swap authority — NO bot-side GPU surgery (lmstudio SDK pinning
+      #         disabled via DFIR_LLM_SWAP_OWNER below). pin_gpu.py is retired.
+      - DFIR_LLM_MODEL=reasoner-31b
+      - DFIR_FAST_MODEL=gpt-oss-20b-heretic
+      - DFIR_SYNTH_MODEL=reasoner-31b
+      - DFIR_SYNTH_CTX=65536
+      - DFIR_CHARS_PER_TOKEN=2.0
+      - DFIR_AGENT_JSON_MODEL=reasoner-31b
+      - DFIR_EML_MODEL=reasoner-31b
+      - DFIR_GENERAL_MODEL=reasoner-31b
+      # llama-swap matrix owns all model swapping; bot must NOT pin GPUs via the
+      # lmstudio SDK (that collided with llama-swap and caused the hangs).
+      - DFIR_LLM_SWAP_OWNER=llamaswap
+      - DFIR_EMBED_URL=http://${DFIR_LLM_HOST:-192.168.100.1}:5899
+      - DFIR_EMBED_MODEL=text-embedding-qwen3-embedding-8b-cpu
+      - DFIR_EMBED_DIM=4096
+      - DFIR_TEXT_COLL_PRIMARY=kb_text_qwen3e8b_v1
+      - DFIR_CTX_BUDGET_CHARS=40000
+      - DFIR_BACKTRACE_SLOT=8000
+      - DFIR_TRIAGE_SLICE_CHARS=34000
+      # LM Studio / gpt-oss tuning knobs. These are safe defaults; change env only,
+      # not code, when optimizing speed/quality.
+      - DFIR_LLM_TEMPERATURE=0.10
+      - DFIR_FAST_TEMPERATURE=0.10
+      - DFIR_STRONG_TEMPERATURE=0.05
+      - DFIR_JSON_TEMPERATURE=0.0
+      - DFIR_LLM_TOP_P=0.85
+      - DFIR_LLM_GPT_OSS_SAFETY=true
+      - DFIR_LLM_REASONING_EFFORT=low
+      - DFIR_FAST_REASONING_EFFORT=low
+      - DFIR_STRONG_REASONING_EFFORT=low
+      - DFIR_JSON_REASONING_EFFORT=low
+      - DFIR_BRIEF_REASONING_EFFORT=low
+      - DFIR_TIMELINE_REASONING_EFFORT=low
+      - DFIR_ASK_REASONING_EFFORT=low
+      - DFIR_AGENT_REASONING_EFFORT=low
+      - DFIR_REACT_MAX_TOKENS=4000
+      - DFIR_ASK_MAX_TOKENS=4000
+      - DFIR_TIMELINE_MAX_TOKENS=4000
+      - DFIR_TIMELINE_STREAM_MAX_TOKENS=4000
+      - DFIR_PLANNER_MAX_TOKENS=4000
+      # Investigate loop (_agentic_investigate). These were read from env but never
+      # set here, so the loop always ran on hardcoded defaults.
+      - DFIR_INVESTIGATE_ROUNDS=3
+      - DFIR_INVESTIGATE_MAX_TOKENS=4000
+      # 120s was tight: a cold model load costs ~60s on its own, and a llama-swap
+      # restart mid-run blew straight through it and killed the whole loop silently.
+      - DFIR_INVESTIGATE_TIMEOUT=240
+      - DFIR_INVESTIGATE_ATTEMPTS=3
+      - DFIR_IDLE_PDF_COMPARE_MAX_TOKENS=4000
+      - DFIR_SELF_IMPROVE_EXTRACT_MAX_TOKENS=4000
+      - DFIR_REPORT_EXTRACT_MAXTOK=4000
+      - DFIR_BRIEF_COMPACT_MAX_TOKENS=4000
+      - DFIR_REACT_NOTHINK=on
+      - DFIR_REACT_MODEL=reasoner-31b
+      - DFIR_JSON_MAX_TOKENS=4000
+      - DFIR_BRIEF_MAX_TOKENS=4000
+      - DFIR_BRIEF_LLM_TIMEOUT_SECONDS=900
+      - DFIR_BRIEF_COMPACT_TIMEOUT_SECONDS=250
+      - DFIR_BRIEF_COMPACT_MAX_TOKENS=4000
+      - DFIR_ASK_MAX_TOKENS=4000
+      - DFIR_SYNTH_MAX_TOKENS=4000
+      - DFIR_SYNTH_TIMEOUT=660
+      - DFIR_TOOLS_TRANSLATE_CHUNK=2500
+      - DFIR_TOOLS_TRANSLATE_MAX_TOKENS=2000
+      - DFIR_TOOLS_TRANSLATE_MAX_CHUNKS=40
+      - DFIR_TIMELINE_MAX_TOKENS=4000
+      - DFIR_TIMELINE_TIMEOUT_SECONDS=300
+      - DFIR_TIMELINE_STRONG_MAX_TOKENS=6000
+      - DFIR_TIMELINE_STREAM_MAX_TOKENS=4000
+      - DFIR_TG_BOT_TOKEN=${DFIR_TG_BOT_TOKEN}
+      - TG_API_BASE=http://tg-i18n:8098
+      - DFIR_ADMIN_CHAT_ID=CHANGE_ME_OWNER_CHAT_ID
+      - VIRUSTOTAL_API_KEY=
+      - ABUSEIPDB_API_KEY=
+      - DFIR_WINDOWS_AGENT_URL=http://192.168.100.1:8788
+      # Non-empty token lights up "🎮 GPU %" in the chat progress bar (host GPU agent
+      # accepts any token in open mode). Already set → GPU% active in /dfir-chat heartbeat.
+      - DFIR_WINDOWS_AGENT_TOKEN=${DFIR_WINDOWS_AGENT_TOKEN}
+      # GENERAL (DFIR-бібліотекар) cross-case mode: answer across ALL accessible cases
+      # with per-case citations + ACL. Set false to revert to deterministic search.
+      - DFIR_GENERAL_MODE=true
+      # CLARIFY-ON-VAGUE: ask back with 2-4 likely interpretations instead of a
+      # poor answer when a question is too short/generic. Fail-open (any error →
+      # normal answer). Set false to disable entirely.
+      - DFIR_CLARIFY_VAGUE=true
+      # CHAT CACHE: reuse a fresh, ACL-safe cross-case (GENERAL/librarian) answer
+      # instead of the ~5-6 min 120B call. Only the full-corpus scope (admin / no
+      # chat context) shares the GLOBAL@<corpus-version> namespace; subset users
+      # always recompute (no cross-user leak). Fail-open (miss/error → normal
+      # answer). Set false to disable cross-case cache lookup/save.
+      - DFIR_CHAT_CACHE=true
+      - DFIR_GPU_IDLE_THRESHOLD=15
+      - DFIR_NIGHT_START=0
+      - DFIR_NIGHT_END=8
+      - DFIR_NIGHT_DEEP=on
+      - DFIR_NIGHT_LEARN=on
+      # Additional Tools ("Додаткові інструменти") — reach the native-libs sidecar.
+      - DFIR_TOOLS_SIDECAR_URL=http://tools-sidecar:8799
+      - BOOKIDX_INBOX=/bookidx_inbox
+      - DFIR_TOOLS_SIDECAR_TIMEOUT=1000
+    ports:
+      # admin pages (user dossier) for the owner browser on the lab LAN only;
+      # never 0.0.0.0 - that would put them on ZeroTier as well
+      - "${DFIR_ADMIN_BIND:-127.0.0.1}:8097:8787"
+    volumes:
+      # 2026-08-01: Open WebUI SQLite. Telegram free-chat conversations are mirrored
+      # into the owner WebUI account (folder Telegram) so they can be read and deleted
+      # in the browser. See analysis/free_chat_webui.py.
+      - "/var/lib/docker/volumes/open-webui/_data:/webui_data"
+      - "./cases:/data/case_library"
+      - "./var/uploads:/tusd_uploads"
+      # refused uploads, kept as evidence of what was tried (see upload_guard)
+      - "./var/quarantine:/data/quarantine"
+      # host-written state the bot reads (VPN account map); see tools/dfir_vpn_sync.py
+      - "./state:/data/state"
+      # a folder per person: links to their material, never copies of it
+      - "./users:/data/users"
+      # the published collector and its manifest (version, date, hash)
+      - "./var/dist:/data/dist:ro"
+      # the Open WebUI admin key, so the bot can create chat accounts
+      - "./state/webui_key:/webui_key:ro"
+      - "./services/case_maintainer/app.py:/app/app.py:ro"
+      - "./var/translate_inbox:/translate_inbox"
+      - "./var/bookidx_inbox:/bookidx_inbox"
+      - "./services/case_maintainer/case_maintainer_addtools.py:/app/case_maintainer_addtools.py:ro"
+      - "./services/case_maintainer/core:/app/core:ro"
+      - "./services/case_maintainer/analysis:/app/analysis:ro"
+      - "./services/case_maintainer/workers:/app/workers:ro"
+      - "./services/case_maintainer/parsers:/app/parsers:ro"
+      - "./services/case_maintainer/reports:/app/reports:ro"
+      - "./services/case_maintainer/chat:/app/chat:ro"
+      - "./services/case_maintainer/telegram:/app/telegram:ro"
+      # audio-translate results: bot writes UA MP3s here; dfir-uploader serves them at /audio/
+      - "./var/audio_results:/audio_results"
+    depends_on:
+      - logdb
+      - tools-sidecar
+    networks:
+      - dfir-net
+
+  # --- 12) TOOLS SIDECAR: native forensic file utilities (Debian slim) ---
+  #  Internal-only (no host port). Reached by case-maintainer on dfir-net as
+  #  "tools-sidecar:8799". Stateless: works in tmpfs /tmp, deletes everything.
+  tools-sidecar:
+    build:
+      context: ./services/tools_sidecar
+      dockerfile: Dockerfile
+    # translate-watcher and bookidx-watcher reuse this image: it must have this name, never pulled
+    image: dfir-tools-sidecar:latest
+    container_name: tools-sidecar
+    command: ["gunicorn","--bind","0.0.0.0:8799","--workers","1","--worker-class","gthread","--threads","8","--timeout","21600","--keep-alive","5","app:app"]
+    restart: unless-stopped
+    expose:
+      - "8799"
+    environment:
+      - SIDECAR_OCR_LANG=ukr+eng
+      - SIDECAR_MAX_BYTES=2147483648          # 2 GB (large audio/video lectures)
+      - SIDECAR_EXTRACT_CHAR_CAP=400000     # translate-extract text cap
+      # --- pdf2zh (PDF->PDF EN->UK translate) ---
+      - OPENAI_BASE_URL=http://localhost:8799/v1
+      - DFIR_GEMMA_URL=http://192.168.100.1:1234/v1
+      - BOOKIDX_UK_MODEL=reasoner-31b
+      - BOOKIDX_MODEL=reasoner-31b            # extraction/description model (strong; cards 2,3)
+      - BOOKIDX_CKPT_DIR=/bookidx_ckpt
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=gemma-2-9b-translate
+      - NOTO_FONT_PATH=/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf
+      - DFIR_PDF2ZH_BIN=pdf2zh
+      - DFIR_PDF2ZH_PROMPT=/app/dfir_pdf2zh_prompt.txt
+      - DFIR_PDF2ZH_THREADS=4
+      - DFIR_PDF2ZH_TIMEOUT=1000
+      - HOME=/root
+      - YARA_RULES=/app/dfir_rules.yar
+      # --- audio-translate long-lecture result delivery (2026-07-05) ---
+      #  Sidecar writes the final UA MP3 (+ optional transcript .txt) straight
+      #  into the shared results dir, served by dfir-uploader nginx at /audio/.
+      - DFIR_AUDIO_RESULTS_DIR=/audio_results
+      - DFIR_UPLOAD_BASE=${DFIR_UPLOAD_BASE:-http://${DFIR_VPN_BOT_IP:-CHANGE_ME_DFIR_LINK_IP}:8080}
+    volumes:
+      - "./services/tools_sidecar/dfir_rules.yar:/app/dfir_rules.yar:ro"
+      # live app.py (edit-without-full-rebuild; mirrors the case-maintainer pattern)
+      - "./services/tools_sidecar/app.py:/app/app.py:ro"
+      # live bookidx llm_client (max_tokens fix, edit-without-rebuild)
+      - "./services/tools_sidecar/bookidx/src/llm_client.py:/app/bookidx/src/llm_client.py:ro"
+      - "./services/tools_sidecar/bookidx/src/llm_extract.py:/app/bookidx/src/llm_extract.py:ro"
+      - "./services/tools_sidecar/bookidx/src/bot_api.py:/app/bookidx/src/bot_api.py:ro"
+      - "./services/tools_sidecar/bookidx/src/normalize.py:/app/bookidx/src/normalize.py:ro"
+      - "./var/bookidx_ckpt:/bookidx_ckpt"
+      # audio-translate results: sidecar writes UA MP3/txt here; nginx serves /audio/
+      - "./var/audio_results:/audio_results"
+    tmpfs:
+      - /tmp:size=8g
+    networks:
+      - dfir-net
+
+
+  translate-watcher:
+    image: dfir-tools-sidecar:latest
+    pull_policy: never
+    restart: unless-stopped
+    command: ["python", "/translate_watch.py"]
+    environment:
+      - LLM_ENDPOINT=http://${DFIR_LLM_HOST:-192.168.100.1}:1234
+      - SBS_MODEL=agent-30b
+      - SBS_WORKERS=4
+    volumes:
+      - "./var/translate_inbox:/translate_inbox"
+      - "./var/translate_output:/translate_output"
+      - "./services/tools_sidecar/translate_watch.py:/translate_watch.py:ro"
+    networks:
+      - dfir-net
+
+  # --- OFFLINE Study bilingual exam-index watcher ---
+  bookidx-watcher:
+    image: dfir-tools-sidecar:latest
+    pull_policy: never
+    restart: unless-stopped
+    command: ["python", "/bookidx_watch.py"]
+    environment:
+      - BOOKIDX_INBOX=/bookidx_inbox
+      - BOOKIDX_OUTPUT=/translate_output
+      - SIDECAR_URL=http://tools-sidecar:8799
+      - BOT_URL=http://case-maintainer:8787
+      # 2026-08-01: the BOOKIDX index of a 169-page book takes ~2h10m, but the client
+      # read timeout defaulted to 3600s -> the watcher gave up after 1h and reported
+      # "Помилка перекладу" while the sidecar finished fine and its result was thrown
+      # away. Match the sidecar gunicorn timeout (21600s).
+      - BOOKIDX_TIMEOUT=21600
+    volumes:
+      - "./var/bookidx_inbox:/bookidx_inbox"
+      - "./var/translate_output:/translate_output"
+      - "./services/tools_sidecar/bookidx_watch.py:/bookidx_watch.py:ro"
+      # read-only view of the engine checkpoints: that is where the progress bar reads from
+      - "./var/bookidx_ckpt:/bookidx_ckpt:ro"
+    depends_on:
+      - tools-sidecar
+    networks:
+      - dfir-net
+
+  # Browser LLM chat for the owner and VPN users (nginx on 8080 proxies "/" here).
+  # SECURITY (2026-09-13, owner): no self-registration, new accounts need approval, and every
+  # server-side feature that would go to the network FROM OUR IP is off (code execution /
+  # interpreter, web search, image generation, direct connections, user webhooks). The model
+  # only returns text: anything a user runs from a CLI agent executes on the USER's machine.
+  # The image is pinned - ":main" silently changes behaviour on every pull.
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:0.13.3
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    environment:
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+      - ENABLE_FORWARD_USER_INFO_HEADERS=true
+      - WEBUI_NAME=DFIR LLM
+      - WEBUI_ADMIN_EMAIL=${WEBUI_ADMIN_EMAIL:-}
+      - WEBUI_ADMIN_PASSWORD=${WEBUI_ADMIN_PASSWORD:-}
+      - WEBUI_ADMIN_NAME=Admin
+      - OPENAI_API_BASE_URL=http://${DFIR_LLM_HOST:-192.168.100.1}:1234/v1
+      - ENABLE_OLLAMA_API=false
+      - WEBUI_AUTH=true
+      - ENABLE_SIGNUP=false
+      - DEFAULT_USER_ROLE=pending
+      - ENABLE_LOGIN_FORM=true
+      - ENABLE_CODE_EXECUTION=false
+      - ENABLE_CODE_INTERPRETER=false
+      - ENABLE_WEB_SEARCH=false
+      - ENABLE_RAG_WEB_SEARCH=false
+      - ENABLE_IMAGE_GENERATION=false
+      - ENABLE_DIRECT_CONNECTIONS=false
+      - ENABLE_COMMUNITY_SHARING=false
+      - ENABLE_USER_WEBHOOKS=false
+      - ENABLE_AUTOCOMPLETE_GENERATION=false
+    volumes:
+      - "open-webui:/app/backend/data"
+    networks:
+      - dfir-net
+
+networks:
+  dfir-net:
+    driver: bridge
+
+volumes:
+  # the existing data volume (users, chats, RAG cache) - external so compose never recreates it
+  open-webui:
+    external: true

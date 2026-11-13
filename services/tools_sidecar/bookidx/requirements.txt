@@ -1,0 +1,14 @@
+# Core PDF parsing (deterministic page numbers come from here)
+pymupdf
+pdfplumber
+# Data / output
+pandas
+openpyxl
+python-docx
+pyyaml
+requests
+tqdm
+# Synthetic test-PDF generation (Testing only)
+reportlab
+# Optional / future: encrypted-PDF support (import is guarded in code)
+pikepdf

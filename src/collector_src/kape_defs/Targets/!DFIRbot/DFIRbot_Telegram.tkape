@@ -1,0 +1,84 @@
+Description: Telegram Desktop - bounded. Evidence (tdata) in full; attachments by type only.
+Author: DFIR-project
+Version: 1.0
+Id: 7a1c0004-0a0a-4b0a-9004-000000000004
+RecreateDirectories: true
+Targets:
+    -
+        Name: Telegram app folder (tdata - messages, keys, config)
+        Category: Apps
+        Path: C:\Users\%user%\AppData\Roaming\Telegram Desktop\
+        Recursive: true
+        Comment: "The actual evidence. Bounded in practice (hundreds of MB)."
+    -
+        Name: Telegram attachments - documents
+        Category: Apps
+        Path: C:\Users\%user%\Downloads\Telegram Desktop\
+        FileMask: "*.doc*"
+        Recursive: true
+    -
+        Name: Telegram attachments - spreadsheets
+        Category: Apps
+        Path: C:\Users\%user%\Downloads\Telegram Desktop\
+        FileMask: "*.xls*"
+        Recursive: true
+    -
+        Name: Telegram attachments - pdf
+        Category: Apps
+        Path: C:\Users\%user%\Downloads\Telegram Desktop\
+        FileMask: "*.pdf"
+        Recursive: true
+    -
+        Name: Telegram attachments - rtf
+        Category: Apps
+        Path: C:\Users\%user%\Downloads\Telegram Desktop\
+        FileMask: "*.rtf"
+        Recursive: true
+    -
+        Name: Telegram attachments - executables
+        Category: Apps
+        Path: C:\Users\%user%\Downloads\Telegram Desktop\
+        FileMask: "*.exe"
+        Recursive: true
+    -
+        Name: Telegram attachments - scripts (js)
+        Category: Apps
+        Path: C:\Users\%user%\Downloads\Telegram Desktop\
+        FileMask: "*.js"
+        Recursive: true
+    -
+        Name: Telegram attachments - scripts (vbs)
+        Category: Apps
+        Path: C:\Users\%user%\Downloads\Telegram Desktop\
+        FileMask: "*.vbs"
+        Recursive: true
+    -
+        Name: Telegram attachments - scripts (ps1)
+        Category: Apps
+        Path: C:\Users\%user%\Downloads\Telegram Desktop\
+        FileMask: "*.ps1"
+        Recursive: true
+    -
+        Name: Telegram attachments - lnk
+        Category: Apps
+        Path: C:\Users\%user%\Downloads\Telegram Desktop\
+        FileMask: "*.lnk"
+        Recursive: true
+    -
+        Name: Telegram attachments - scr
+        Category: Apps
+        Path: C:\Users\%user%\Downloads\Telegram Desktop\
+        FileMask: "*.scr"
+        Recursive: true
+
+# WHY THIS EXISTS instead of the stock Apps\Telegram.tkape
+# The stock target collects C:\Users\%user%\Downloads\Telegram Desktop\ RECURSIVELY with no
+# mask and no size limit. On the owner's machine that folder held a VM clone
+# (Ubuntu_DFiR_Bot-cl1-000004.vmdk 210 GB + 4x *.vmem 34 GB) -> a single triage ballooned to
+# 440 GB and 7za was still zipping it 3.5 hours later. KAPE has NO file-size option and
+# .tkape has no size filter, so the only in-KAPE control is the FileMask.
+# Kept: the phishing-relevant attachment types (documents, archives are handled by the bot
+# from $MFT metadata anyway) - these are what an attacker actually delivers over Telegram.
+# Dropped: media and disk images (*.vmdk *.vmem *.iso *.mp4 *.mkv *.zip ...). Their NAMES,
+# sizes and timestamps still reach the bot through the $MFT/USN parse, so nothing is blind -
+# only the multi-GB CONTENT is skipped.

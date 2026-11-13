@@ -1,0 +1,57 @@
+# DFIR Collector Builder on a GitHub Windows runner.
+#
+# The builder is the ONE Windows file people download: it fetches the third-party tools from
+# their authors, compiles the collector with the person's own bot key and writes DFIR_Collector.exe
+# (see src/collector_builder/Builder.cs). Nothing licensed is stored in this repository.
+#
+# Every push that touches the collector or the builder produces an artifact; a tag v* also
+# publishes it as a release. Tools whose upstream disappeared are served from the release
+# "tools-mirror" of this repository (upload once: see infra/github/README, section Mirror).
+name: builder
+
+on:
+  push:
+    paths:
+      - 'src/collector_builder/**'
+      - 'src/collector_src/**'
+      - '.github/workflows/builder.yml'
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build DFIR_Collector_Builder.exe
+        shell: pwsh
+        run: |
+          ./src/collector_builder/make_builder.ps1 -Repo . -Out out `
+            -Mirror "https://github.com/${{ github.repository }}/releases/download/tools-mirror"
+
+      - name: Smoke test (seal parsing, embedded resources)
+        shell: pwsh
+        run: |
+          # a wrong seal must be refused before any download: proves the EXE starts and parses
+          $p = Start-Process out/DFIR_Collector_Builder.exe -ArgumentList '--cli --seal bad --kape x --out t' -Wait -PassThru -NoNewWindow
+          if ($p.ExitCode -ne 1) { throw "expected exit 1 for a bad seal, got $($p.ExitCode)" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DFIR_Collector_Builder
+          path: out/
+          retention-days: 30
+
+      - name: Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" out/DFIR_Collector_Builder.exe out/DFIR_Collector_Builder.exe.sha256 `
+            --title "DFIR Collector Builder ${{ github.ref_name }}" `
+            --notes "Run DFIR_Collector_Builder.exe, paste your bot key (install.sh prints it), point it at kape.zip and press the button."

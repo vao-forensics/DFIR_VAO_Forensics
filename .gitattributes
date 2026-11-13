@@ -1,0 +1,4 @@
+# The collector sources are edited on the Windows host and copied here byte-for-byte.
+# Any end-of-line conversion breaks the only cheap drift check we have (md5 host vs VM)
+# and turns a 20-line change into a 577-line diff. Store exactly what the host has.
+collector_src/** -text

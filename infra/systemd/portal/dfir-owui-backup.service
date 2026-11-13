@@ -1,0 +1,10 @@
+[Unit]
+Description=DFIR: Nightly backup of the web portal database
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=DFIR_ROOT=@ROOT@
+Environment=DFIR_PORTAL_LLM=http://@LLM@:1234
+ExecStart=/usr/bin/python3 @ROOT@/tools/owui_backup.py
+TimeoutStartSec=3600

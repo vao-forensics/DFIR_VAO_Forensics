@@ -1,0 +1,13 @@
+Name: MinimalTest
+Author: Your Name
+Description: Minimal target test
+Category: FileCollection
+Version: 1.0
+Id: 123e4567-e89b-12d3-a456-426614174000
+RecreateDirectories: true
+Targets:
+  -
+    Name: System32 Minimal Test
+    Category: TestCategory
+    Path: C:\Windows\System32
+    Recursive: true

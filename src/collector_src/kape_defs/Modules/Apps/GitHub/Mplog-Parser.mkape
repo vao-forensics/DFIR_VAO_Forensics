@@ -1,0 +1,28 @@
+Description: 'Mplog-Parser: parses Microsoft Protection log files into CSV files'
+Category: Antivirus
+Author: Thomas DIOT (Qazeer)
+Version: 1.1
+Id: 6084c8ab-2059-41a4-89f4-dba2cfdb4bb4
+BinaryUrl: https://github.com/Qazeer/mplog_parser-compiled/releases/download/v1.0/mplog_parser.exe
+ExportFormat: csv
+Processors:
+    -
+        Executable: vao_mplogparser.exe
+        CommandLine: -d "%SourceDirectory%\C\ProgramData\Microsoft\Windows Defender\Support" -o "%destinationDirectory%"
+        ExportFormat: csv
+
+# LOCAL FIX 2026-08-09 (v1.0 -> v1.1): the upstream CommandLine was missing the drive-letter
+# component. KAPE lays collected files out as <tdest>\C\ProgramData\... (verified against a real
+# collection), so "%SourceDirectory%\ProgramData\..." pointed at a folder that never exists and
+# the module produced NOTHING while exiting quietly. Measured: with the path as shipped ->
+# exit 1, empty output; with \C\ added -> exit 0, 2 CSVs from a 17.6 MB MPLog in 1.2 s.
+# BitsParser.mkape in this same folder already uses the \C\ form, which is what tipped me off.
+
+# Documentation
+# Mplog-Parser parses Microsoft Protection log files into a number of CSV files.
+# mplog_parser source: https://github.com/Intrinsec/mplog_parser
+# Compiled version: https://github.com/Qazeer/mplog_parser-compiled
+# Information on Windows Defender MPLog:
+# https://www.crowdstrike.com/blog/how-to-use-microsoft-protection-logging-for-forensic-investigations/
+# https://www.intrinsec.com/hunt-mplogs/
+# https://artefacts.help/windows_defender_support_logs.html

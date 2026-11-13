@@ -1,0 +1,10 @@
+[Unit]
+Description=DFIR: Portal self-check and safe self-repair (timer)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=12min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

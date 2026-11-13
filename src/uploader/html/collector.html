@@ -1,0 +1,55 @@
+<!-- The download page exists so the link in the bot's help never has to be edited again.
+     A static text cannot say which build it is handing out; this page reads the manifest
+     that publish_collector.py writes beside the binary, so version, date, size and hash
+     are whatever is actually being served. -->
+<meta charset="utf-8">
+<title>Збирач DFIR</title>
+<style>
+  body{font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif;margin:0;padding:28px;
+       background:#f6f7f9;color:#111}
+  .card{max-width:640px;margin:0 auto;background:#fff;border:1px solid #e3e5e8;
+        border-radius:10px;padding:22px 24px}
+  h1{font-size:20px;margin:0 0 4px} .muted{color:#666;font-size:13px}
+  table{border-collapse:collapse;width:100%;margin:16px 0}
+  td{border-top:1px solid #eee;padding:7px 4px;font-size:14px}
+  td:first-child{color:#666;width:130px}
+  code{font-family:ui-monospace,Consolas,monospace;font-size:12px;word-break:break-all}
+  a.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;
+        padding:11px 20px;border-radius:7px;font-weight:600}
+  .warn{background:#fff8e6;border:1px solid #f0e0b0;border-radius:7px;padding:10px 12px;
+        font-size:13px;margin-top:16px}
+</style>
+<div class="card">
+  <h1>Збирач DFIR</h1>
+  <div class="muted">Артефакти KAPE, підозрілі бінарники, жива система, пам'ять.</div>
+
+  <table id="info">
+    <tr><td>Версія</td><td id="ver">…</td></tr>
+    <tr><td>Зібрано</td><td id="built">…</td></tr>
+    <tr><td>Розмір</td><td id="size">…</td></tr>
+    <tr><td>SHA-256</td><td><code id="sha">…</code></td></tr>
+  </table>
+
+  <a class="btn" href="/collector.exe" download>⬇ Завантажити збирач</a>
+
+  <div class="warn">
+    Запускати <b>від імені адміністратора</b>. SmartScreen: «Детальніше» → «Виконати все одно».
+    Хеш вище — щоб переконатися, що завантажилось саме те, що ми віддали:
+    <code>certutil -hashfile DFIR_Collector.exe SHA256</code>
+  </div>
+</div>
+<script>
+// The page asks the bot what it is serving rather than repeating a number written here.
+fetch('/collector.json?t=' + Date.now())
+  .then(r => r.json())
+  .then(m => {
+    document.getElementById('ver').textContent = m.version || '—';
+    document.getElementById('built').textContent = m.built || '—';
+    document.getElementById('size').textContent =
+      m.size_bytes ? (m.size_bytes / 1048576).toFixed(0) + ' МБ' : '—';
+    document.getElementById('sha').textContent = m.sha256 || '—';
+  })
+  .catch(() => {
+    document.getElementById('ver').textContent = 'не вдалося прочитати маніфест';
+  });
+</script>

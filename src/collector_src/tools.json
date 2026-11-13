@@ -1,0 +1,397 @@
+{
+ "_comment": [
+  "What DFIR Collector Builder downloads and where each file lands under Modules\\bin.",
+  "tier: fast = extracted for FAST collections, full = only for FULL. Everything outside Modules\\bin is core.",
+  "kind: file (url is the file itself), zip / 7z / msi / nupkg (take 'take' out of the archive),",
+  "      zipdir (unpack the whole archive into 'dest'), user (the person points the builder at a file they downloaded).",
+  "Always the newest: 'github'+'asset' = newest release (GitHub's per-asset sha256 digest is checked); other urls are",
+  "      re-checked with HEAD (ETag/Last-Modified) on every build, so the cache never serves an old file.",
+  "sha256 pins the FINAL file; with 'pin_tag' the pin holds only for that release (a newer one is checked by digest/signature).",
+  "signer: the main program must carry a valid Authenticode signature of this publisher (WinVerifyTrust).",
+  "Fallback: when the official source fails or fails verification, {mirror}/<id>.<ext> (or mirror_name) is used and must",
+  "      match {mirror}/SHA256SUMS. tools/collector_mirror_sync.py fills the mirror. Version+check land in TOOLS_PROVENANCE.txt.",
+  "{mirror} = https://github.com/<this repository>/releases/download/tools-mirror : tools whose upstream disappeared or",
+  "dropped the .NET Framework build the collector needs (targets must run with no runtime installed)."
+ ],
+ "user": [
+  {
+   "id": "kape",
+   "required": true,
+   "dest": "..\\..",
+   "take": [
+    "kape.exe"
+   ],
+   "label": "KAPE (Kroll)",
+   "page": "https://www.kroll.com/en/services/cyber/incident-response-recovery/kroll-artifact-parser-and-extractor-kape",
+   "note": "Free; Kroll emails a download link after a short form. Point the builder at the downloaded kape.zip."
+  },
+  {
+   "id": "thor-lite",
+   "required": false,
+   "tier": "full",
+   "dest": "thor-lite",
+   "license_file": "*.lic",
+   "label": "THOR Lite (Nextron)",
+   "page": "https://www.nextron-systems.com/thor-lite/",
+   "note": "Free licence for registered users; give the builder the THOR Lite zip and your .lic file."
+  },
+  {
+   "id": "memory",
+   "required": false,
+   "tier": "fast",
+   "dest": "memory",
+   "take": [
+    "DumpIt.exe",
+    "MRCv120.exe"
+   ],
+   "label": "Magnet DumpIt / RAM Capture",
+   "page": "https://www.magnetforensics.com/resources/magnet-dumpit-for-windows/",
+   "note": "Needed only for RAM capture; registration required by Magnet."
+  }
+ ],
+ "tools": [
+  {
+   "id": "AmcacheParser",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "{mirror}/AmcacheParser.zip",
+   "take": "AmcacheParser.exe",
+   "signer": "ZimTech LLC",
+   "sha256": {
+    "AmcacheParser.exe": "3ab9272679fa970f95f2193ad39b1fe75d026edd9a621f5e3e716e09fe737d52"
+   },
+   "license": "MIT (Eric Zimmerman), last .NET Framework build (root zip removed 2026-10, only /net/ = .NET 9 left)"
+  },
+  {
+   "id": "AppCompatCacheParser",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "https://download.ericzimmermanstools.com/AppCompatCacheParser.zip",
+   "take": "AppCompatCacheParser.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "JLECmd",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "https://download.ericzimmermanstools.com/JLECmd.zip",
+   "take": "JLECmd.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "LECmd",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "https://download.ericzimmermanstools.com/LECmd.zip",
+   "take": "LECmd.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "MFTECmd",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "https://download.ericzimmermanstools.com/MFTECmd.zip",
+   "take": "MFTECmd.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "PECmd",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "https://download.ericzimmermanstools.com/PECmd.zip",
+   "take": "PECmd.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "RBCmd",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "https://download.ericzimmermanstools.com/RBCmd.zip",
+   "take": "RBCmd.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "SBECmd",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "https://download.ericzimmermanstools.com/SBECmd.zip",
+   "take": "SBECmd.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "SrumECmd",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "https://download.ericzimmermanstools.com/SrumECmd.zip",
+   "take": "SrumECmd.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "bstrings",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "https://download.ericzimmermanstools.com/bstrings.zip",
+   "take": "bstrings.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "RecentFileCacheParser",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "https://download.ericzimmermanstools.com/RecentFileCacheParser.zip",
+   "take": "RecentFileCacheParser.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "SumECmd",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "https://download.ericzimmermanstools.com/SumECmd.zip",
+   "take": "SumECmd.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "rla",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "https://download.ericzimmermanstools.com/rla.zip",
+   "take": "rla.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "EvtxECmd",
+   "tier": "fast",
+   "kind": "zipdir",
+   "url": "https://download.ericzimmermanstools.com/EvtxECmd.zip",
+   "dest": "EvtxECmd",
+   "check": "EvtxECmd\\EvtxECmd.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "RECmd",
+   "tier": "fast",
+   "kind": "zipdir",
+   "url": "https://download.ericzimmermanstools.com/RECmd.zip",
+   "dest": "RECmd",
+   "check": "RECmd\\RECmd.exe",
+   "signer": "ZimTech LLC"
+  },
+  {
+   "id": "SQLECmd",
+   "tier": "fast",
+   "kind": "zipdir",
+   "url": "{mirror}/SQLECmd.zip",
+   "dest": "SQLECmd",
+   "check": "SQLECmd\\SQLECmd.exe",
+   "sha256": {
+    "SQLECmd\\SQLECmd.exe": "164408234526001bbe1aef44cb6fe121be5b24243903317d06589a50ec4a9248"
+   },
+   "license": "MIT (Eric Zimmerman), last .NET Framework build"
+  },
+  {
+   "id": "WxTCmd",
+   "tier": "fast",
+   "kind": "file",
+   "url": "{mirror}/WxTCmd.exe",
+   "take": "WxTCmd.exe",
+   "sha256": {
+    "WxTCmd.exe": "c9e1db6f6bbdc610255d64ca841db1bed5320a5ab75395909ddbeeabf7281555"
+   },
+   "license": "MIT (Eric Zimmerman), last .NET Framework build"
+  },
+  {
+   "id": "Microsoft.Win32.Registry",
+   "tier": "fast",
+   "kind": "nupkg",
+   "url": "https://api.nuget.org/v3-flatcontainer/microsoft.win32.registry/4.5.0/microsoft.win32.registry.4.5.0.nupkg",
+   "take": "lib/net461/Microsoft.Win32.Registry.dll",
+   "rename": "Microsoft.Win32.Registry.dll",
+   "note": "AppCompatCacheParser needs it and its own zip does not ship it"
+  },
+  {
+   "id": "Browserparser",
+   "tier": "fast",
+   "kind": "file",
+   "github": "seba7236/BrowserParser",
+   "asset": "^Browserparser\\.exe$",
+   "prerelease": true,
+   "take": "Browserparser\\Browserparser.exe",
+   "pin_tag": "v1.0.2",
+   "sha256": {
+    "Browserparser\\Browserparser.exe": "3cc0ee8cad807f76ccfa95d0c92d3be969f1484a87c87dc28e18ab9b64fceb2a"
+   }
+  },
+  {
+   "id": "BrowserDownloadsView",
+   "tier": "fast",
+   "kind": "zip",
+   "url": "https://www.nirsoft.net/utils/browserdownloadsview-x64.zip",
+   "take": "BrowserDownloadsView.exe"
+  },
+  {
+   "id": "hindsight",
+   "tier": "fast",
+   "kind": "file",
+   "github": "obsidianforensics/hindsight",
+   "asset": "^hindsight\\.exe$",
+   "take": "hindsight.exe"
+  },
+  {
+   "id": "hayabusa",
+   "tier": "fast",
+   "kind": "zipdir",
+   "github": "Yamato-Security/hayabusa",
+   "asset": "^hayabusa-[0-9.]+-win-x64\\.zip$",
+   "dest": "hayabusa",
+   "rename_glob": {
+    "hayabusa-*-win-x64.exe": "hayabusa.exe"
+   },
+   "check": "hayabusa\\hayabusa.exe"
+  },
+  {
+   "id": "LogParser",
+   "tier": "fast",
+   "kind": "msi",
+   "url": "https://download.microsoft.com/download/f/f/1/ff1819f9-f702-48a5-bbc7-c9656bc74de8/LogParser.msi",
+   "take": "LogParser.exe"
+  },
+  {
+   "id": "vao_dhparser",
+   "tier": "fast",
+   "kind": "file",
+   "url": "https://raw.githubusercontent.com/jklepsercyber/defender-detectionhistory-parser/main/dhparser.exe",
+   "take": "vao_dhparser.exe",
+   "sha256": {
+    "vao_dhparser.exe": "989038da175c80bee12b59427bc01c57347cfe168fe911e2b9669ef291dfafe6"
+   }
+  },
+  {
+   "id": "vao_mplogparser",
+   "tier": "fast",
+   "kind": "file",
+   "github": "Qazeer/mplog_parser-compiled",
+   "asset": "^mplog_parser\\.exe$",
+   "take": "vao_mplogparser.exe",
+   "pin_tag": "v1.0",
+   "sha256": {
+    "vao_mplogparser.exe": "695555a3f493eddeb02976d66a37de932c04150ad3abb561e1b9480c188cfcb3"
+   }
+  },
+  {
+   "id": "vao_bitsparser",
+   "tier": "fast",
+   "kind": "file",
+   "url": "https://raw.githubusercontent.com/conexioninversa/BitsParser/master/BitsParser.exe",
+   "take": "vao_bitsparser.exe",
+   "sha256": {
+    "vao_bitsparser.exe": "6a7e737732670ae4e0e53131116c8f6ce33e3910037b0fbe05f4aea0c3a23246"
+   }
+  },
+  {
+   "id": "chainsaw",
+   "tier": "full",
+   "kind": "zipdir",
+   "github": "WithSecureLabs/chainsaw",
+   "asset": "^chainsaw_all_platforms\\+rules\\+examples\\.zip$",
+   "dest": "chainsaw",
+   "drop": [
+    "sigma/regression_data",
+    "examples",
+    "*apple-darwin*",
+    "*unknown-linux*"
+   ],
+   "rename_glob": {
+    "chainsaw_x86_64-pc-windows-msvc.exe": "Chainsaw.exe"
+   },
+   "check": "chainsaw\\Chainsaw.exe"
+  },
+  {
+   "id": "DeepBlueCLI",
+   "tier": "full",
+   "kind": "zipdir",
+   "url": "https://github.com/sans-blue-team/DeepBlueCLI/archive/refs/heads/master.zip",
+   "dest": "DeepBlueCLI",
+   "check": "DeepBlueCLI\\DeepBlue.ps1"
+  },
+  {
+   "id": "regripper",
+   "tier": "full",
+   "kind": "zipdir",
+   "url": "https://github.com/keydet89/RegRipper3.0/archive/refs/heads/master.zip",
+   "dest": "regripper",
+   "check": "regripper\\rip.exe"
+  },
+  {
+   "id": "Reghunter",
+   "tier": "full",
+   "kind": "file",
+   "github": "theflakes/reg_hunter",
+   "asset": "^reg_hunter\\.exe$",
+   "take": "Reghunter\\reg_hunter-64.exe",
+   "copy_to": [
+    "Reghunter\\reg_hunter.exe"
+   ]
+  },
+  {
+   "id": "Autoruns",
+   "tier": "full",
+   "kind": "zipdir",
+   "url": "https://download.sysinternals.com/files/Autoruns.zip",
+   "dest": "Autoruns",
+   "copy_to": {
+    "Autoruns\\autorunsc.exe": "autorunsc.exe",
+    "Autoruns\\autorunsc64.exe": "autorunsc64.exe"
+   },
+   "check": "autorunsc64.exe",
+   "signer": "Microsoft Corporation"
+  },
+  {
+   "id": "vao_leveldbdumper",
+   "tier": "full",
+   "kind": "file",
+   "github": "mdawsonuk/LevelDBDumper",
+   "asset": "^LevelDBDumper\\.exe$",
+   "take": "vao_leveldbdumper.exe",
+   "pin_tag": "v3.0.0",
+   "sha256": {
+    "vao_leveldbdumper.exe": "e527508217693781f7a2d9a6752de2c4061c0a67f9bd576d318d22b46cf79c4f"
+   }
+  },
+  {
+   "id": "vao_loldriverscan",
+   "tier": "full",
+   "kind": "zip",
+   "github": "FourCoreLabs/LolDriverScan",
+   "asset": "^LolDriverScan_[0-9.]+_windows_amd64\\.zip$",
+   "take": "*.exe",
+   "rename": "vao_loldriverscan.exe",
+   "pin_tag": "v1.2",
+   "sha256": {
+    "vao_loldriverscan.exe": "6d6feb54aeb075e3858c4c73ea15b48c44fae1fc3d705baeddafc6aa18f48da3"
+   }
+  },
+  {
+   "id": "vao_teamsparser",
+   "tier": "full",
+   "kind": "zip",
+   "github": "lxndrblz/forensicsim",
+   "asset": "^forensicsim\\.zip$",
+   "take": "*ms_teams_parser.exe",
+   "rename": "TeamsParser\\vao_teamsparser.exe",
+   "pin_tag": "v0.8.5",
+   "sha256": {
+    "TeamsParser\\vao_teamsparser.exe": "0981f4d2a90b7b42d8b6487d94483be79ab5a36e5b8b1e4dd63bc6a4676e657c"
+   }
+  }
+ ],
+ "sevenzip": {
+  "github": "ip7z/7zip",
+  "bootstrap_asset": "^7zr\\.exe$",
+  "extra_asset": "^7z[0-9]+-extra\\.7z$",
+  "take": [
+   "7za.exe",
+   "license.txt"
+  ],
+  "dest": "7za"
+ }
+}

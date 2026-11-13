@@ -1,0 +1,112 @@
+{
+ "flavour": "net4",
+ "note": "Zimmerman tools shipped in the collector payload (.NET 4 line: it runs on stock Windows, the net9 builds need a runtime the target machine will not have). Compared weekly against download.ericzimmermanstools.com by the VM checker.",
+ "source_page": "https://tools.ericzimmermanstools.com",
+ "tools": {
+  "AmcacheParser": {
+   "file": "AmcacheParser.exe",
+   "sha1": "5326182b3a456ea95fc84860bf9e0a8e55d7fc13",
+   "size": 3494512,
+   "url": "https://download.ericzimmermanstools.com/AmcacheParser.zip",
+   "version": "2026.5.0.0"
+  },
+  "AppCompatCacheParser": {
+   "file": "AppCompatCacheParser.exe",
+   "sha1": "54040f226c0f3fa068cb7a9beadf6ce005315441",
+   "size": 3364464,
+   "url": "https://download.ericzimmermanstools.com/AppCompatCacheParser.zip",
+   "version": "2026.5.0.0"
+  },
+  "EvtxECmd": {
+   "file": "EvtxECmd/EvtxECmd.exe",
+   "sha1": "bc147e7641c1127119354b878752209d717a423f",
+   "size": 3981936,
+   "url": "https://download.ericzimmermanstools.com/EvtxECmd.zip",
+   "version": "2026.5.0.0"
+  },
+  "JLECmd": {
+   "file": "JLECmd.exe",
+   "sha1": "79b9f686cf0d5b9b4261a0b89eb6bd744df2b39f",
+   "size": 3900528,
+   "url": "https://download.ericzimmermanstools.com/JLECmd.zip",
+   "version": "2026.5.0.0"
+  },
+  "LECmd": {
+   "file": "LECmd.exe",
+   "sha1": "adcfd9fa8c90b786e26fbfc37fb77dc58b1ecad3",
+   "size": 3830896,
+   "url": "https://download.ericzimmermanstools.com/LECmd.zip",
+   "version": "2026.5.0.0"
+  },
+  "MFTECmd": {
+   "file": "MFTECmd.exe",
+   "sha1": "2aec8e249da405787ee32d9e91dd68824aa49246",
+   "size": 3396208,
+   "url": "https://download.ericzimmermanstools.com/MFTECmd.zip",
+   "version": "2026.5.0.0"
+  },
+  "PECmd": {
+   "file": "PECmd.exe",
+   "sha1": "30460a431cb9609f5c787e92de41421928b232e4",
+   "size": 2913392,
+   "url": "https://download.ericzimmermanstools.com/PECmd.zip",
+   "version": "2026.5.0.0"
+  },
+  "RBCmd": {
+   "file": "RBCmd.exe",
+   "sha1": "14bb86002293f35d3b0ef3d0cb4e7d914eab8ddf",
+   "size": 2319984,
+   "url": "https://download.ericzimmermanstools.com/RBCmd.zip",
+   "version": "2026.5.0.0"
+  },
+  "RECmd": {
+   "file": "RECmd/RECmd.exe",
+   "sha1": "836a84ad2445fc01050083682869a2ca4bd454ad",
+   "size": 4409968,
+   "url": "https://download.ericzimmermanstools.com/RECmd.zip",
+   "version": "2026.5.0.0"
+  },
+  "RecentFileCacheParser": {
+   "file": "RecentFileCacheParser.exe",
+   "sha1": "958f8eba5e9fbeeaf1daaac733ba5458d8f399b0",
+   "size": 2054768,
+   "url": "https://download.ericzimmermanstools.com/RecentFileCacheParser.zip",
+   "version": "2026.5.0.0"
+  },
+  "SBECmd": {
+   "file": "SBECmd.exe",
+   "sha1": "54499a0c5e1d23733c002d2eb627d889f0b9b74f",
+   "size": 4463728,
+   "url": "https://download.ericzimmermanstools.com/SBECmd.zip",
+   "version": "2026.5.0.0"
+  },
+  "SrumECmd": {
+   "file": "SrumECmd.exe",
+   "sha1": "f3feeec9811170c5a01130e451db0aae003c6798",
+   "size": 3028592,
+   "url": "https://download.ericzimmermanstools.com/SrumECmd.zip",
+   "version": "2026.5.0.0"
+  },
+  "SumECmd": {
+   "file": "SumECmd.exe",
+   "sha1": "c65fc0701b5c5326bac2f92891f811cc1fddd9fe",
+   "size": 2219632,
+   "url": "https://download.ericzimmermanstools.com/SumECmd.zip",
+   "version": "2026.5.0.0"
+  },
+  "bstrings": {
+   "file": "bstrings.exe",
+   "sha1": "34eb913e48e5a4179d28af62606f51400c07394f",
+   "size": 4175472,
+   "url": "https://download.ericzimmermanstools.com/bstrings.zip",
+   "version": "2026.5.0.0"
+  },
+  "rla": {
+   "file": "rla.exe",
+   "sha1": "185226cd351040ccc822e3d4249784c0a2cecfca",
+   "size": 3192944,
+   "url": "https://download.ericzimmermanstools.com/rla.zip",
+   "version": "2026.5.0.0"
+  }
+ }
+}

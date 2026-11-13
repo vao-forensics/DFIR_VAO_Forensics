@@ -1,0 +1,5 @@
+(^|\.)pypi\.org$
+(^|\.)pythonhosted\.org$
+(^|\.)github\.com$
+(^|\.)githubusercontent\.com$
+(^|\.)debian\.org$

@@ -1,0 +1,10 @@
+[Unit]
+Description=DFIR: Same tools and rules for every chat model
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=DFIR_ROOT=@ROOT@
+Environment=DFIR_PORTAL_LLM=http://@LLM@:1234
+ExecStart=/usr/bin/python3 @ROOT@/tools/sync_models.py
+TimeoutStartSec=3600

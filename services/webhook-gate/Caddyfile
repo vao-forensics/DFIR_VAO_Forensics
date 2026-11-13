@@ -1,0 +1,22 @@
+{
+	admin off
+	auto_https off
+}
+# Webhook-only gate: the internet (via ngrok) may reach ONLY the Telegram webhook.
+# Everything else (UI, /signin, /rest, /api, /form, other webhooks such as the old
+# openclaw-ask) -> 404. n8n UI stays reachable directly on n8n:5678 inside the VM.
+:8099 {
+	@telegram path /webhook/dfir-bot-v10/webhook
+	handle @telegram {
+		# 23.10: through tg-i18n (answers /language, forwards the rest to n8n); if it is down,
+		# straight to n8n, so the bot keeps working without translation
+		reverse_proxy tg-i18n:8098 n8n:5678 {
+			lb_policy first
+			lb_try_duration 5s
+			fail_duration 30s
+		}
+	}
+	handle {
+		respond 404
+	}
+}

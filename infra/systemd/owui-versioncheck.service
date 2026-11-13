@@ -1,0 +1,5 @@
+[Unit]
+Description=Open WebUI new-version check (notify owner only)
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /srv/dfir/scripts/owui_version_check.sh

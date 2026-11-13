@@ -1,0 +1,9 @@
+[Unit]
+Description=Every 15 min: autosave uncommitted /srv/dfir work
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+
+[Install]
+WantedBy=timers.target

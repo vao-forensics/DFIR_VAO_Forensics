@@ -1,0 +1,14 @@
+[Unit]
+Description=DFIR sandbox analysis API for Open WebUI (docker-bridge only)
+After=docker.service
+Requires=docker.service
+[Service]
+EnvironmentFile=@ROOT@/sandbox/api.env
+Environment=SBX_BIND=@BIND@ SBX_PORT=8791 SBX_PARALLEL=2
+ExecStartPre=-/bin/sh -c "docker image inspect dfir-sandbox:0.1 >/dev/null 2>&1 || docker build -q -t dfir-sandbox:0.1 @ROOT@/sandbox/image"
+TimeoutStartSec=900
+ExecStart=/usr/bin/python3 @ROOT@/sandbox/sandbox_api.py
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,4 @@
+# 2026-10-08: VMware lsilogic disk does not report its cache page, Linux assumes "write through"
+# and never sends SYNCHRONIZE CACHE -> fsync did not reach the host disk; power loss = zeroed files.
+# Force write back so the kernel issues flushes on fsync/journal commit.
+ACTION=="add|change", SUBSYSTEM=="scsi_disk", ATTR{cache_type}=="write through", ATTR{cache_type}="temporary write back"

@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DFIR Large Upload</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:760px;margin:32px auto;padding:0 16px}
+    .card{border:1px solid #ddd;border-radius:12px;padding:16px}
+    .drop{border:2px dashed #999;border-radius:12px;padding:30px;text-align:center;margin:12px 0}
+    .ok{color:#0a7f2e}.err{color:#b00020}.muted{color:#666}
+    progress{width:100%}
+    input,button{font-size:16px;padding:10px}
+    .row{margin:8px 0}
+  </style>
+</head>
+<body>
+  <h2>📦 Завантаження великих файлів (до 10GB)</h2>
+  <div class="card">
+    <p class="muted">Параметри підтягуються з Telegram-лінка автоматично.</p>
+
+    <div class="row">
+      <label>Режим:</label><br/>
+      <input id="mode" placeholder="kb/report/logs/raw" style="width:100%;max-width:280px" />
+    </div>
+
+    <div class="row">
+      <label>Telegram chat_id:</label><br/>
+      <input id="chat" placeholder="CHANGE_ME_OWNER_CHAT_ID" style="width:100%;max-width:280px" />
+    </div>
+
+    <div class="row">
+      <label>Назва кейсу:</label><br/>
+      <input id="casename" placeholder="06_02_2026_case_58_phishing" style="width:100%;max-width:400px" />
+      <div id="casehint" style="display:none;margin-top:6px"></div>
+    </div>
+
+    <div class="row" id="pdfpassRow">
+      <label>Пароль до PDF (якщо захищений):</label><br/>
+      <input id="pdfpass" type="text" placeholder="лишіть порожнім якщо немає" style="width:100%;max-width:400px" autocomplete="off" />
+    </div>
+
+    <div class="drop" id="drop">Перетягни файл сюди або <input type="file" id="file" /></div>
+    <button id="up">⬆️ Завантажити</button>
+    <p id="st" class="muted">Статус: очікування</p>
+    <progress id="pg" value="0" max="100"></progress>
+  </div>
+<script>
+
+window.addEventListener('error', (e) => {
+  const stEl = document.getElementById('st');
+  if (stEl) stEl.innerHTML = '<span class="err">❌ JS error: ' + (e.message||'unknown') + '</span>';
+});
+
+const tusdBase = location.origin + '/files/';
+const st = document.getElementById('st');
+const pg = document.getElementById('pg');
+const fileInput = document.getElementById('file');
+const drop = document.getElementById('drop');
+const chatEl = document.getElementById('chat');
+const modeEl = document.getElementById('mode');
+const caseEl = document.getElementById('casename');
+let selected = null;
+let uploading = false;
+function toB64Utf8(s){ return btoa(unescape(encodeURIComponent(String(s||'')))); }
+
+// Autofill from URL
+const qp = new URLSearchParams(location.search);
+const qChat = qp.get('chat_id') || qp.get('chatId') || qp.get('chatid') || qp.get('userId') || qp.get('userid') || '';
+const qMode = (qp.get('mode') || 'kb').toLowerCase();
+const qCase = qp.get('case_key') || qp.get('case_name') || qp.get('case') || '';
+if (qChat) { chatEl.value = qChat; chatEl.readOnly = true; }
+if (qMode) { modeEl.value = qMode; modeEl.readOnly = true; }
+// PDF password is only for document/report uploads — hide it for logs/raw/kape.
+if (["logs","raw","kape"].includes(qMode)) { var _pr=document.getElementById("pdfpassRow"); if(_pr) _pr.style.display="none"; }
+if (qCase) { caseEl.value = qCase; caseEl.readOnly = true; }
+
+fileInput.onchange = () => selected = fileInput.files[0];
+drop.ondragover = e => { e.preventDefault(); };
+drop.ondrop = e => { e.preventDefault(); selected = e.dataTransfer.files[0]; st.textContent = 'Файл: ' + selected.name; };
+
+async function upload(file, chatId, mode, caseName, pdfPass){
+  const meta = [
+    `filename ${toB64Utf8(file.name)}`,
+    `chat_id ${toB64Utf8(String(chatId||''))}`,
+    `mode ${toB64Utf8(String(mode||'kb'))}`,
+  ];
+  if (caseName) meta.push(`case_key ${toB64Utf8(String(caseName))}`);
+  if (pdfPass) meta.push(`pdf_password ${toB64Utf8(String(pdfPass))}`);
+  const create = await fetch(tusdBase, {
+    method: 'POST',
+    headers: {
+      'Tus-Resumable': '1.0.0',
+      'Upload-Length': String(file.size),
+      'Upload-Metadata': meta.join(',')
+    }
+  });
+  if(!create.ok){ throw new Error('Create failed: ' + create.status); }
+  const loc = create.headers.get('Location') || '';
+  const u = new URL(loc, location.origin);
+  const url = location.origin + u.pathname;
+
+  const _pp = new URLSearchParams(location.search);
+  const _chat = _pp.get('chat_id') || (typeof chatEl!=='undefined' && chatEl.value) || '';
+  const _ck = _pp.get('case_key') || '';
+  let _progMsgId = null, _lastPost = 0;
+  const chunk = 5 * 1024 * 1024;
+  let offset = 0;
+  while(offset < file.size){
+    const end = Math.min(offset + chunk, file.size);
+    const blob = file.slice(offset, end);
+    const r = await fetch(url, {
+      method:'PATCH',
+      headers:{
+        'Tus-Resumable':'1.0.0',
+        'Upload-Offset': String(offset),
+        'Content-Type':'application/offset+octet-stream'
+      },
+      body: blob
+    });
+    if(!r.ok){ const t = await r.text().catch(()=> ''); throw new Error('Patch failed: ' + r.status + ' ' + t); }
+    offset = Number(r.headers.get('Upload-Offset') || end);
+    pg.value = Math.round((offset/file.size)*100);
+    st.textContent = 'Завантаження: ' + pg.value + '%';
+    if (_chat && _ck && (Date.now()-_lastPost > 1500 || pg.value >= 100)) {
+      _lastPost = Date.now();
+      try { const _pr = await fetch('/upload-progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:_chat,case_key:_ck,percent:pg.value,message_id:_progMsgId,file_name:file.name,size_mb:Math.round(file.size/1048576)})}); const _pj = await _pr.json(); if(_pj.message_id) _progMsgId=_pj.message_id; } catch(e){}
+    }
+  }
+  st.innerHTML = '<span class="ok">✅ Завантажено. Далі обробка в n8n.</span>';
+  if (_chat && _ck) { try { await fetch('/upload-progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:_chat,case_key:_ck,percent:100,done:true,message_id:_progMsgId,file_name:file.name,size_mb:Math.round(file.size/1048576)})}); } catch(e){} }
+}
+
+
+// --- case name: check it, and offer the house format as buttons ------------------
+async function checkCaseName(name){
+  try {
+    const r = await fetch('/case-name/check?case_key=' + encodeURIComponent(name));
+    return await r.json();
+  } catch(e) { return null; }   // checker down: never block an upload over a name
+}
+
+function offerCaseNames(v){
+  const box = document.getElementById('casehint');
+  const list = (v.suggestions || []);
+  let html = '<div class="err">❌ ' + (v.reason || 'Назва не за форматом') + '</div>';
+  if (list.length) {
+    html += '<div class="muted" style="margin:6px 0">Оберіть варіант або виправте самі:</div>';
+    list.forEach((s, i) => {
+      html += '<button type="button" class="casepick" data-v="' + s + '" ' +
+              'style="margin:2px 4px 2px 0;padding:4px 8px;cursor:pointer">' +
+              (i === 0 ? '⭐ ' : '') + s + '</button>';
+    });
+  }
+  html += '<button type="button" id="casekeep" style="margin:2px 0;padding:4px 8px;' +
+          'cursor:pointer">залишити як є</button>';
+  box.innerHTML = html;
+  box.style.display = 'block';
+  box.querySelectorAll('.casepick').forEach(b => {
+    b.onclick = () => {
+      caseEl.value = b.getAttribute('data-v');
+      box.style.display = 'none';
+      document.getElementById('up').click();
+    };
+  });
+  const keep = document.getElementById('casekeep');
+  if (keep) keep.onclick = () => {
+    caseEl.readOnly = true;          // decision made: do not ask again for this upload
+    box.style.display = 'none';
+    document.getElementById('up').click();
+  };
+}
+
+document.getElementById('up').onclick = async () => {
+  const btn = document.getElementById('up');
+  if (uploading) return;
+  try {
+    if(!selected){ throw new Error('Оберіть файл'); }
+    const chat = chatEl.value.trim();
+    const mode = (modeEl.value.trim() || 'kb').toLowerCase();
+    const caseName = caseEl.value.trim();
+    const pdfPass = (document.getElementById("pdfpass") || {}).value || "";
+    if(!chat){ throw new Error('Вкажіть chat_id'); }
+    if(!caseName && mode === 'logs'){ throw new Error('Вкажіть назву кейсу для logs'); }
+    if (caseName && !caseEl.readOnly) {
+      const verdict = await checkCaseName(caseName);
+      if (verdict && !verdict.valid) {
+        uploading = false; btn.disabled = false; btn.textContent = '⬆️ Завантажити';
+        offerCaseNames(verdict);
+        return;
+      }
+    }
+    uploading = true;
+    btn.disabled = true;
+    btn.textContent = '⏳ Завантаження...';
+    st.textContent = 'Підготовка upload...';
+    await upload(selected, chat, mode, caseName, pdfPass);
+  } catch(e){ st.innerHTML = '<span class="err">❌ ' + e.message + '</span>'; }
+  finally {
+    uploading = false;
+    btn.disabled = false;
+    btn.textContent = '⬆️ Завантажити';
+  }
+};
+</script>
+</body></html>

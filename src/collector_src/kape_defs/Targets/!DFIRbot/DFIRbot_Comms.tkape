@@ -1,0 +1,38 @@
+Description: DFIR bot COMMS — mail + messengers (opt-in; can be tens of GB). Parsed by the bot, not here.
+Author: DFIR-project
+Version: 1.0
+Id: 7a1c0003-0a0a-4b0a-9003-000000000003
+RecreateDirectories: true
+Targets:
+    -
+        Name: OutlookPSTOST
+        Category: Apps
+        Path: OutlookPSTOST.tkape
+    -
+        Name: Thunderbird
+        Category: Apps
+        Path: Thunderbird.tkape
+    -
+        Name: Telegram
+        Category: Apps
+        Path: DFIRbot_Telegram.tkape
+    -
+        Name: WhatsApp
+        Category: Apps
+        Path: WhatsApp.tkape
+    -
+        Name: Signal
+        Category: Apps
+        Path: Signal.tkape
+    -
+        Name: Viber
+        Category: Apps
+        Path: Viber.tkape
+    -
+        Name: Skype
+        Category: Apps
+        Path: Skype.tkape
+    -
+        Name: Discord
+        Category: Apps
+        Path: Discord.tkape

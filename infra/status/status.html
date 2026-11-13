@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="uk" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="google" content="notranslate">
+<title>Стан системи</title>
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--line:#30363d;--txt:#e6edf3;--mut:#8b949e;--acc:#58a6ff;--ok:#3fb950;--warn:#d29922;--hot:#f85149}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:15px/1.4 -apple-system,Segoe UI,Roboto,Arial,sans-serif;min-height:100vh;padding:16px}
+.wrap{max-width:720px;margin:0 auto}
+h1{font-size:20px;font-weight:600;margin:4px 0 16px;display:flex;align-items:center;gap:10px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(63,185,80,.6);animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,185,80,.5)}70%{box-shadow:0 0 0 10px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.model{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.mname{font-size:18px;font-weight:600}
+.state{font-size:13px;padding:4px 10px;border-radius:20px;background:rgba(63,185,80,.15);color:var(--ok)}
+.state.loading{background:rgba(210,153,34,.15);color:var(--warn)}
+.state.idle{background:rgba(139,148,158,.15);color:var(--mut)}
+.lbar{height:6px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:12px;display:none}
+.lbar.on{display:block}
+.lfill{height:100%;width:30%;background:linear-gradient(90deg,var(--warn),var(--acc));border-radius:6px;animation:slide 1.4s ease-in-out infinite}
+@keyframes slide{0%{margin-left:-30%}100%{margin-left:100%}}
+.ring{display:flex;align-items:center;gap:18px}
+.big{font-size:42px;font-weight:700;line-height:1}
+.sub{color:var(--mut);font-size:13px}
+.gpus{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:end;height:170px;margin-top:6px}
+.g{display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:6px}
+.col{width:100%;max-width:56px;flex:1;background:var(--line);border-radius:10px;position:relative;overflow:hidden;display:flex;align-items:flex-end}
+.fill{width:100%;border-radius:10px;transition:height .9s cubic-bezier(.2,.8,.2,1),background .6s;background:var(--acc)}
+.pct{font-size:13px;font-weight:600}
+.gl{font-size:12px;color:var(--mut)}
+.foot{color:var(--mut);font-size:12px;text-align:center;margin-top:6px}
+@media (max-width:420px){.gpus{height:140px;gap:6px}.big{font-size:34px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="dot" id="dot"></span>Стан системи</h1>
+
+  <div class="card">
+    <div class="model">
+      <div>
+        <div class="sub">Зараз працює модель</div>
+        <div class="mname" id="mname">—</div>
+      </div>
+      <div class="state idle" id="state">очікування</div>
+    </div>
+    <div class="lbar" id="lbar"><div class="lfill"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="ring">
+      <div><div class="big" id="busy">0%</div><div class="sub">загальне навантаження</div></div>
+      <div class="sub" id="hint">Система вільна — відповідь буде швидкою.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sub" style="margin-bottom:8px">Обчислювальні карти</div>
+    <div class="gpus" id="gpus"></div>
+  </div>
+
+  <div class="foot" id="foot">оновлюється автоматично</div>
+</div>
+<script>
+const gpus=document.getElementById('gpus');
+function color(p){return p>=75?'var(--hot)':p>=40?'var(--warn)':'var(--acc)'}
+function ensureCols(n){
+  if(gpus.children.length===n)return;
+  gpus.innerHTML='';
+  for(let i=0;i<n;i++){
+    const g=document.createElement('div');g.className='g';
+    g.innerHTML='<div class="pct">0%</div><div class="col"><div class="fill" style="height:2%"></div></div><div class="gl">Карта '+(i+1)+'</div>';
+    gpus.appendChild(g);
+  }
+}
+async function tick(){
+  try{
+    const r=await fetch('/status-api?ts='+Date.now(),{cache:'no-store'});
+    const d=await r.json();
+    const cards=d.cards||[];
+    ensureCols(cards.length||5);
+    cards.forEach((u,i)=>{
+      const g=gpus.children[i];if(!g)return;
+      g.querySelector('.pct').textContent=u+'%';
+      const f=g.querySelector('.fill');f.style.height=Math.max(2,u)+'%';f.style.background=color(u);
+    });
+    const busy=d.busy||0;
+    document.getElementById('busy').textContent=busy+'%';
+    document.getElementById('mname').textContent=d.label||'—';
+    const st=document.getElementById('state'),lb=document.getElementById('lbar'),hint=document.getElementById('hint');
+    if(d.loading){st.className='state loading';st.textContent='завантажується…';lb.className='lbar on';hint.textContent='Модель готується до роботи — зачекайте трохи.';}
+    else if(busy>15){st.className='state';st.textContent='думає';lb.className='lbar';hint.textContent='Модель обробляє запит.';}
+    else if(d.label){st.className='state';st.textContent='готова';lb.className='lbar';hint.textContent='Система вільна — відповідь буде швидкою.';}
+    else{st.className='state idle';st.textContent='очікування';lb.className='lbar';hint.textContent='Модель запуститься з першим запитом.';}
+    document.getElementById('dot').style.background='var(--ok)';
+    document.getElementById('foot').textContent='оновлено '+new Date().toLocaleTimeString('uk-UA');
+  }catch(e){
+    document.getElementById('dot').style.background='var(--hot)';
+    document.getElementById('foot').textContent='немає звʼязку зі станом — повторюю…';
+  }
+}
+tick();setInterval(tick,1500);
+</script>
+</body>
+</html>

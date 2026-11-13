@@ -1,0 +1,20 @@
+Description: THOR Lite — QUICK bounded filescan for fast DFIR triage (NOT a full disk scan)
+Category: IOCs
+Author: DFIR-project
+Version: 1.0
+Id: 7a1c0003-0a0a-4b0a-9003-000000000003
+BinaryUrl: https://www.nextron-systems.com/thor-lite/
+ExportFormat: csv
+WaitTimeout: 30
+Processors:
+    -
+        Executable: thor-lite\thor64-lite.exe
+        CommandLine: -a Filescan --quick --norescontrol --max_file_size 30000000 -p %sourceDirectory% -e %destinationDirectory%\THOR
+        ExportFormat: csv
+
+# NOTE: Tuned for SPEED — scans ONLY the collected triage set (%sourceDirectory%),
+# NOT --alldrives, NOT --intense.
+# FIX 2026-07-29: removed the invalid flag `--csvfile` (NOT a THOR/THOR-Lite option — absent
+# from THOR docs and both stock Thor-Lite_Scan and full Thor_Scan modules; it errored the run).
+# THOR's Filescan writes `<hostname>_files_md5s.csv` (md5,path,size) into the -e dir on its own,
+# which the bot ingests (parsers/forensic.py classify: name contains 'files_md5s' -> thor_md5).

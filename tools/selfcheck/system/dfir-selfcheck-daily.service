@@ -1,0 +1,8 @@
+[Unit]
+Description=DFIR VM daily self-check (silent when green; owner chat only when something is wrong)
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I /srv/dfir/tools/selfcheck/dfir_selfcheck.py --no-deep --quiet-green
+TimeoutStartSec=1800

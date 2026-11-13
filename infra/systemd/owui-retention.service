@@ -1,0 +1,8 @@
+[Unit]
+Description=Open WebUI upload retention (delete uploads older than 24h)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker exec -e DRY_RUN=0 -e PYTHONPATH=/app/backend -e RETENTION_TTL_HOURS=24 -e WEBUI_SECRET_KEY=retention-worker-dummy open-webui python /app/backend/data/retention.py

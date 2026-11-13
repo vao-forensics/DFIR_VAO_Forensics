@@ -1,0 +1,10 @@
+[Unit]
+Description=DFIR: Learn reusable skills from good answers (local LLM)
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=DFIR_ROOT=@ROOT@
+Environment=DFIR_PORTAL_LLM=http://@LLM@:1234
+ExecStart=/usr/bin/python3 @ROOT@/tools/skill_miner.py
+TimeoutStartSec=3600

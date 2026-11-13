@@ -1,0 +1,89 @@
+{
+  "_doc": "T9: optional parts of an install. ONE list read by install.sh (question, compose override, apply steps), verify_install.sh, `dfir modules` and tg-i18n (hides the buttons of a switched-off module and refuses their taps). MODULES_OFF in state/install_answers.env = space-separated ids; unset or empty = everything on (an existing install behaves as before). size_gb = measured on the reference install 12.11.2026 (docker image ls / file sizes), what is NOT downloaded when the module is off. callbacks: exact callback_data, or a prefix followed by ':'. images = image repositories used ONLY by this module: removed when it is switched off (the shared tools-sidecar image is never listed).",
+  "modules": [
+    {
+      "id": "webchat",
+      "size_gb": 6.7,
+      "services": [
+        "open-webui"
+      ],
+      "steps": [
+        "webui",
+        "sandbox"
+      ],
+      "callbacks": [],
+      "measured": "ghcr.io/open-webui/open-webui:0.13.3 6.46 GB + dfir-sandbox:0.1 0.25 GB",
+      "images": [
+        "ghcr.io/open-webui/open-webui",
+        "dfir-sandbox"
+      ]
+    },
+    {
+      "id": "hashdb",
+      "size_gb": 1.6,
+      "services": [],
+      "steps": [
+        "sources"
+      ],
+      "callbacks": [],
+      "measured": "cases/_hashdb: CIRCL bloom 1.00 GB + MalwareBazaar 0.23 GB zip / 0.32 GB sqlite + Vanilla 0.08 GB",
+      "images": []
+    },
+    {
+      "id": "translate",
+      "size_gb": 0,
+      "services": [
+        "translate-watcher"
+      ],
+      "steps": [],
+      "callbacks": [
+        "tool:pdf_translate",
+        "tool:translate"
+      ],
+      "measured": "uses the tools-sidecar image the core needs anyway: frees RAM/CPU and the LLM, not disk",
+      "images": []
+    },
+    {
+      "id": "bookidx",
+      "size_gb": 0,
+      "services": [
+        "bookidx-watcher"
+      ],
+      "steps": [],
+      "callbacks": [
+        "tool:bookidx_index"
+      ],
+      "measured": "tools-sidecar image (core); your own Study PDFs only",
+      "images": []
+    },
+    {
+      "id": "media",
+      "size_gb": 0,
+      "services": [],
+      "steps": [],
+      "callbacks": [
+        "tool:audio_clean",
+        "tool:audio_translate_ua",
+        "tool:book_mp3",
+        "tool:diarize",
+        "tool:img_enhance",
+        "tool:img_plate",
+        "tool:restore_faces"
+      ],
+      "measured": "runs on the Windows host (Host Agent), install.sh downloads nothing for it",
+      "images": []
+    },
+    {
+      "id": "ram",
+      "size_gb": 0,
+      "services": [],
+      "steps": [],
+      "callbacks": [
+        "up_ram",
+        "ram_keys"
+      ],
+      "measured": "the RAM-dump worker is not installed by install.sh yet: only the buttons",
+      "images": []
+    }
+  ]
+}

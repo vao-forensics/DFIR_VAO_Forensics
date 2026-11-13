@@ -1,0 +1,9 @@
+[Unit]
+Description=DFIR: Update per-user adaptation profiles (timer)
+
+[Timer]
+OnCalendar=*-*-* 04:17:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
